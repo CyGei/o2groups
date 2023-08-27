@@ -1,0 +1,327 @@
+
+# Overview
+
+[Assortativity](https://en.wikipedia.org/wiki/Assortativity) refers to
+the tendency of individuals to interact preferentially with others who
+are similar to them in certain attributes. The assortativity coefficient
+`delta` plays a crucial role in modeling epidemics by capturing the
+mixing patterns within a population. In the context of epidemics,
+assortativity specifically measures the extent to which infections are
+more likely to spread within certain groups compared to others. A
+`delta` value greater than 1 indicates that individuals are more likely
+to interact and transmit infections within their own group, while a
+`delta` value below 1 suggests a tendency for infections to spread
+across different groups.
+
+The assortativity coefficient has significant implications for epidemic
+dynamics. High assortativity can lead to concentrated outbreaks within
+specific groups, potentially resulting in faster spread and larger
+clusters of infected individuals. Conversely, low assortativity promotes
+more even mixing between groups, which may lead to a more widespread but
+potentially slower epidemic.
+
+Changes in assortativity over time can indicate shifts in behavior or
+social interactions that may impact the spread of the disease. As a
+result, the assortativity coefficient can serve as an informative
+indicator of the effectiveness of non-pharmaceutical interventions, such
+as physical distancing measures or targeted interventions within
+specific groups.
+
+The `o2groups` package provides a framework for modeling outbreaks using
+branching processes specifically designed for scenarios involving
+multiple groups.
+
+# Installation
+
+``` r
+#devtools::install_github("CyGei/o2groups")
+library(o2groups)
+#library(tidyverse)
+```
+
+# Example
+
+## Simulation
+
+We first specify the input parameters for our simulation.
+
+``` r
+n_simulations = 100
+n_cores = parallel::detectCores() - 2
+duration = 100
+n_groups = 4
+size = c(1e3, 1e4, 1e3, 1e3)
+name = LETTERS[1:n_groups]
+delta = c(10, 2, 1, 4)
+intro_group = LETTERS[1:n_groups]
+intro_n = rep(10, n_groups)
+r0 = c(3, 4, 2, 3.5)
+generation_time = simulacr::make_disc_gamma(mean = 5, sd = 2)$d(1:30)
+```
+
+We then run the outbreak simulation 100 times to account for
+stochasticity.
+
+``` r
+set.seed(123)
+
+  out <-
+  simulate_groups_furrr(
+    n_simulations = n_simulations,
+    duration = duration,
+    n_groups = n_groups,
+    size = size,
+    name = name,
+    delta = delta,
+    intro_group = intro_group,
+    intro_n = intro_n,
+    r0 = r0,
+    generation_time = simulacr::make_disc_gamma(mean = 5, sd = 2)$d(1:30) )
+
+data = out$data
+stats = out$stats
+```
+
+## Depletion of susceptibles
+
+``` r
+pal = c("A" = "magenta", "B" = "orange", "C" = "forestgreen", "D" = "steelblue")
+gg_col <- list(
+  scale_color_manual(values = pal),
+  scale_fill_manual(values = pal)
+)
+gg_scale <- list(scale_x_continuous(breaks = seq(0,100,10)))
+
+
+#plot_tree(subset(data, simulation == 1), pal = pal)
+#plot_stats(stats)[[1]] + gg_col + gg_scale
+plot_stats(stats)[[2]] + gg_col  + gg_scale
+```
+
+![](README_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+
+## Case Reproduction Number
+
+``` r
+# Indiv Ri
+Ri <-
+  map(.x = unique(data$simulation), ~ get_Ri(data[data$simulation == .x,])) %>%
+  bind_rows(., .id = "simulation")
+
+Ri_long <- Ri %>%
+  pivot_longer(cols = LETTERS[1:4],
+               names_to = "target") %>%
+  select(simulation, id, group, target, value, date_infection)
+
+# Summary Ri
+Ri_sims <- Ri_long %>%
+  group_by(group, target, date_infection, simulation) %>%
+  summarise(Ri = mean(value))
+Ri_means <- Ri_sims %>%
+  group_by(group, target, date_infection) %>%
+  summarise(Ri = mean(Ri))
+
+# Total Ri
+total_Ri_sims <- Ri %>%
+  group_by(simulation, group, date_infection) %>%
+  summarise(Ri = mean(Ri))
+
+total_Ri_means <- Ri %>%
+  group_by(group, date_infection) %>%
+  summarise(Ri = mean(Ri))
+```
+
+``` r
+# plot
+p_facet_Ri <- ggplot(data = Ri_sims,
+                     aes(x = date_infection,
+                         y = Ri,
+                         col = group)) +
+  facet_grid(target ~ group, scales = "free_y") +
+  geom_point(alpha = 0.5) +
+  geom_line(data = Ri_means,
+            col = "black") +
+  theme_bw()+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none") +
+  gg_col +
+  gg_scale+
+  scale_y_continuous(breaks = 0:10)
+
+
+p_total_Ri <- ggplot(total_Ri_sims,
+                     aes(x = date_infection,
+                         y = Ri,
+                         col = group,
+                         group = group)) +
+  geom_point() +
+  geom_line(data = total_Ri_means,
+            col = "black") +
+  geom_hline(data = tibble(group = LETTERS[1:4],
+                           r0 = r0 ),
+             aes(yintercept = r0, group = group),
+             col = "#4C4E52", lty = "solid")+
+  geom_hline(aes(yintercept = 1), col = "#4C4E52", lty = "dotted")+
+  facet_grid(~ group) +
+  theme_bw()+
+  theme( strip.text.x = element_blank(),
+         legend.position = "none")+
+  gg_col +
+  gg_scale+
+  scale_y_continuous(breaks = 0:10)
+
+patchwork::wrap_plots(p_facet_Ri,p_total_Ri, ncol = 1, guides = "collect",
+                      heights = c(3,1))
+```
+
+![](README_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+
+The plot above describes the average number of secondary cases a primary
+case from a given group (columns) generates in every group (rows) over
+time.
+
+## Mixing
+
+``` r
+# compute the mixing proportions at every timepoint
+mix_t <- map(.x = unique(data$simulation),
+             function(sim) {
+               sim_data <- filter(data, simulation == sim)
+               map(.x = unique(sim_data$date_infection),
+                   function(date) {
+                     mix <- sim_data %>% get_mixing(., min_t = date, max_t = date)
+                     return(mix$result)
+                   }) %>%
+                 bind_rows(., .id = "t") %>%
+                 mutate(t = as.integer(t))
+             }) %>%
+  bind_rows(., .id = "simulation") %>%
+  mutate(across(c(source_group, group),
+                ~ factor(., levels = LETTERS[1:4])))
+
+mean_freqs <- mix_t %>%
+  group_by(t, source_group, group) %>%
+  summarise(freq = mean(freq))
+
+# inital mixing frequencies
+Truth <- generate_Mcol(
+  n_groups = n_groups,
+  size = size,
+  name = LETTERS[1:4],
+  delta = delta
+) %>%
+  as.data.frame(.) %>%
+  rownames_to_column(var = "group") %>%
+  pivot_longer(-group, names_to = "source_group", values_to = "value") %>%
+  select(source_group, group, value) %>%
+  arrange(source_group)
+
+
+ggplot(mix_t) +
+  aes(x = t,
+      y = freq ,
+      col = source_group) +
+  facet_grid(group ~ source_group) +
+  geom_point() +
+  geom_line(data = mean_freqs, col = "#4C4E52") +
+  geom_hline(data = Truth,
+             aes(yintercept = value), lty = "dotted") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  gg_col +
+  gg_scale
+```
+
+![](README_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+
+The plot above illustrates the temporal evolution of group infection
+mixing. Each data point corresponds to the percentage of infections
+originating from a particular group (column) and spreading to another
+group (row) at time t. The solid grey line represents the average
+infection mixing frequency, while the dotted line represents the initial
+mixing frequency.
+
+## Retrieve `delta`
+
+The previous plot highlighted how saturation affects the infection
+mixing proportions.
+
+### Early Phase
+
+`Delta` values can be derived from the groups’ sizes and the observed
+mixing frequencies during the initial stage of the epidemic, when most
+of the groups’ individuals are susceptible.
+
+Note that it is important to find the right early phase window to
+retrieve the appropriate mixing matrix (`Mcol_observed`).
+
+``` r
+#early phase
+Mcol_observed <- get_mixing(data, min_t = 5, max_t = 12)$Mcol
+
+Mcol_to_delta(n_groups = n_groups,
+              size = size,
+              name = LETTERS[1:4],
+              Mcol_observed = Mcol_observed) %>% round()
+```
+
+    ##  A  B  C  D 
+    ## 10  2  1  4
+
+### At any time point
+
+In addition, we can estimate delta at any given time point by
+incorporating additional information such as the group’s basic
+reproduction number (R0) and the proportion of susceptible individuals
+at a specific time (t). The code below estimates delta over every time
+point.
+
+``` r
+timepoints <- 1:100
+output <- matrix(NA, nrow = length(timepoints), ncol = n_groups)
+
+for (tp in timepoints) {
+  Mcolt_observed <- get_mixing(data, min_t = tp, max_t = tp)$Mcol
+
+  prop_sus <- stats %>%
+    filter(time == tp) %>%
+    group_by(group) %>%
+    summarise(prop_susceptible = mean(prop_susceptible)) %>%
+    pull(prop_susceptible)
+
+  delta_optim <- Mcolt_to_delta_optim(
+    n_groups = 4,
+    size = size,
+    name =name,
+    r0 = r0,
+    prop_susceptible = prop_sus,
+    Mcolt_observed = Mcolt_observed
+  )
+
+  output[tp, ] <- delta_optim
+
+}
+colnames(output) <- name
+```
+
+However, it is important to note that estimating `delta` during the very
+early or late stages of the epidemic may be less reliable due to
+potential limitations in sample size.
+
+``` r
+output %>%
+  as_tibble() %>%
+  mutate(timepoint = row_number()) %>%
+  filter(timepoint <= 40) %>%
+  pivot_longer(cols = -timepoint, names_to = "group", values_to = "delta") %>%
+  ggplot(aes(x = timepoint, y = delta, col = group))+
+  geom_point()+
+  geom_line()+
+  geom_hline(data = tibble(delta = delta), aes(yintercept = delta))+
+  gg_col+
+  theme_bw()
+```
+
+![](README_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
