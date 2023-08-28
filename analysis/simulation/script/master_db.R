@@ -1,72 +1,79 @@
+time_start <- format(Sys.time(), "%Y-%m-%d-%H:%M")
 library(DBI)
 library(RSQLite)
 library(randomNames)
+library(here)
+
 
 # 0. Parameters --------------------------------------------------------------------------------------------
-n_scenarios <- 3
+n_scenarios <- 3000
 peak_coeffs <- seq(0.7 , 1, 0.1)
+rseed <- sample(100000:999999, 1)
 
-# 1. Folder set-up --------------------------------------------------------------------------------------------
-folder_names <- list.dirs("analysis/simulation/data",
-                          recursive = FALSE,
-                          full.names = FALSE
-)
-run_name <- randomNames::randomNames(1, gender = 1, ethnicity = 6, which.names = "first")
-while (run_name %in% folder_names) {
-  run_name <- randomNames::randomNames(1, gender = 1, ethnicity = 6, which.names = "first")
-}
-output_dir <- paste0("analysis/simulation/data/", run_name)
-dir.create(output_dir, recursive = TRUE)
 
-time_start <- format(Sys.time(), "%Y-%m-%d-%H:%M")
+# 1. Database Set-up --------------------------------------------------------------------------------------------
+output_dir <- here("analysis/simulation/data")
+db_conn <-
+  dbConnect(RSQLite::SQLite(), dbname = paste0(output_dir, "/database.db"))
 
 # 2. Generate scenarios --------------------------------------------------------------------------------------------
 source("analysis/simulation/script/generate_scenarios.R")
-scenarios <- generate_scenarios(n_scenarios)
+scenarios <- generate_scenarios(n_scenarios, seed = rseed)
 saveRDS(scenarios, paste0(output_dir, "/scenarios.rds"))
 
-# 3. Run simulations -----------------------------------------------------------------------
+# 3. Processing -----------------------------------------------------------------------
 source("analysis/simulation/script/run_simulations.R")
-# simulations
-simulations_time <- system.time({
-  simulations <- run_simulations(scenarios)
+
+process_time <- system.time({
+  for (i in seq_along(scenarios)) {
+    scenario <- scenarios[[i]]
+    simulation <- run_simulations_db(scenario)
+
+    result <- purrr::map_dfr(peak_coeffs, ~ {
+      peak_est <-
+        o2groups::process_simulation(simulation, .x, scenario$size, scenario$name) %>%
+        mutate(scenario = scenario$scenario, peak_coeff = .x)
+      return(peak_est)
+    })
+
+    dbWriteTable(db_conn, "simulations", simulation, append = TRUE)
+    dbWriteTable(db_conn, "results", result, append = TRUE)
+
+  }
+
+  rm(list = c("scenario", "simulation"))
 })
-saveRDS(simulations, file = paste0(output_dir, "/simulations.rds"))
-saveRDS(simulations_time, file = paste0(output_dir, "/simulations_time.rds"))
 
-# 4. Process simulations --------------------------------------------------------------------------------------------
-source("analysis/simulation/script/process_simulations.R")
+dbDisconnect(db_conn)
 
-results_time <- system.time({
-  results <- process_simulations(scenarios,simulations, peak_coeffs)
-})
-
-saveRDS(results, file = paste0(output_dir, "/results.rds"))
-saveRDS(results_time, file = paste0(output_dir, "/results_time.rds"))
-
-
-# 4. Model Delta Bias --------------------------------------------------------------------------------------------
-#source("simulation/script/model.R")
-
-# 5. Save the run details --------------------------------------------------------------------------------------------
+# 4. Save the run details --------------------------------------------------------------------------------------------
 time_end <- format(Sys.time(), "%Y-%m-%d-%H:%M")
 
 # Convert to POSIXct datetime objects
 time_start <- as.POSIXct(time_start, format = "%Y-%m-%d-%H:%M")
 time_end <- as.POSIXct(time_end, format = "%Y-%m-%d-%H:%M")
-
-# Calculate the time difference
 totaltime <- time_end - time_start
 
 run_details <- data.frame(
-  run_name = run_name,
+  rseed = rseed,
   time_start = as.character(time_start),
   time_end = as.character(time_end),
   totaltime = as.numeric(totaltime),
   n_scenarios = n_scenarios,
   peak_coeffs = paste(peak_coeffs, collapse = ", "),
-  simulations_time = simulations_time[[3]],
-  results_time = results_time[[3]]
-)
-saveRDS(run_details, file = paste0(output_dir, "/run_details.rds"))
+  process_time = process_time[[3]]
+  )
+saveRDS(run_details,
+        file = paste0(output_dir, "/run_details_", Sys.Date(), ".rds"))
+
+
+
+# Query ---------------------------------------------------------------------------------------
+
+# # Example SQL query
+# query <- "SELECT * FROM results"
+#
+# # Execute the query and retrieve the results as a data frame
+# results <- dbGetQuery(db_conn, query)
+
 

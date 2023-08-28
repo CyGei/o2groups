@@ -62,11 +62,12 @@ generate_scenarios <- function(n, seed = 123){
   set.seed(seed)
   # Create a list to store all scenarios
   scenarios <- vector("list", n)
+  pseudonyms <- noah::pseudonymize(seq_len(n))
 
-  # Generate 1000 scenarios
+
   for (i in 1:n) {
     scenario <- generate_scenarios_helper()
-    scenario$scenario <- i
+    scenario$scenario <- pseudonyms[i]
     scenarios[[i]] <- scenario
   }
   return(scenarios)

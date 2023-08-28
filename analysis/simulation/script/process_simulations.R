@@ -17,6 +17,7 @@ process_simulations <-
     num_batches <- ceiling(num_scenarios / num_workers)
     future::plan(multisession, workers = num_workers)
 
+    # Simulations are split into batches
     sim_batches <- split(simulations,
                          rep(1:num_batches,
                              each = num_workers,
@@ -32,6 +33,7 @@ process_simulations <-
       sim_batch <- sim_batches[[batch]]
       scenario_batch <- scenario_batches[[batch]]
 
+      # Each worker processes one scenario-simulation pair in parallel
       batch_results[[batch]] <-
         foreach(i = 1:length(scenario_batch),
                 .combine = rbind) %dofuture% {
