@@ -12,6 +12,9 @@ reverse_standardise <- function(d) {
   return(x)
 }
 
+normalise <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
 # Scenarios ------------------------------------------------------------------
 scenarios <- readRDS("analysis/simulation/data/scenarios.rds")
 
@@ -31,9 +34,7 @@ scenarios_df <- lapply(scenarios, remove_obj) %>%
 
 
 # Raw results -------------------------------------------------------------
-results <- readRDS("analysis/simulation/data/results.rds")
-results_df <- results %>%
-  bind_rows()
+results_df <- readRDS("analysis/simulation/data/results.rds")
 
 
 
@@ -76,6 +77,7 @@ model_df <-
       .fns = standardise
     ),
     bias = delta - est,
+   # norm_bias = normalise(bias),
     is_within_ci = ifelse(delta >= lower_ci &
                             delta <= upper_ci,
                           TRUE,
@@ -89,40 +91,100 @@ model_df <-
   )
 
 
-saveRDS(model_df, "analysis/simulation/data/model_df.rds")
+#saveRDS(model_df, "analysis/simulation/data/model_df.rds")
 
 
 
 
 # VISU ----------------------------------------------------------------------------------------
-model_df <- readRDS("analysis/simulation/data/model_df.rds")
+#model_df <- readRDS("analysis/simulation/data/model_df.rds")
+
+predictors <- c("delta", "n_groups", "size", "intro_n", "r0", "GT_mean", "GT_sd")
+plot_relationship <- function(predictor) {
+  # Aggregate data by the dependent variable and calculate mean bias
+  aggregated_data <- model_df %>%
+    group_by(peak_coeff, .data[[predictor]]) %>%
+    summarize(mean_bias = mean(bias))
+
+  # Create a scatter plot
+  ggplot(aggregated_data, aes(x = .data[[predictor]], y = mean_bias)) +
+    geom_point(aes(col = peak_coeff)) +
+    geom_hline(aes(yintercept = 0), col = "steelblue")+
+    labs(x = predictor, y = "Mean Bias") +
+    ggtitle(paste("Relationship between", predictor, "and Mean Bias"))
+}
+
+# plot all relationships using lapply
+lapply(predictors, plot_relationship)
+plot_relationship("r0")
 
 
-model_df %>%
-  ggplot(aes(x = size, y = bias, col = group))+
-  facet_wrap(~scenario)+
-  geom_point()+
-  geom_hline(yintercept = 0)
+library(corrplot)
 
-model_df %>%
-  ggplot(aes(x = size, y = bias, col = group))+
-  facet_wrap(~scenario)+
-  geom_point()+
-  geom_hline(yintercept = 0)
+correlation_matrix <- cor(model_df[, c("bias", predictors)])
+corrplot(correlation_matrix, method = "color")
 
-model_df %>%
-  ggplot(aes(x = delta, y = bias, col = group))+
-  facet_wrap(~scenario)+
-  geom_point()+
-  geom_hline(yintercept = 0)+
-  geom_vline(xintercept = 0)
+
+
+
+# Modelling -----------------------------------------------------------------------------------
+
+predictors <- c("delta", "n_groups", "size", "intro_n", "r0", "GT_mean", "GT_sd")
+outcome <- "bias"
+summary_df <- model_df %>%
+  filter(as.numeric(scenario) <= 400) %>%
+  group_by(scenario, simulation, peak_coeff) %>%
+  summarise(across(all_of(c(predictors, outcome)), list(mean = ~mean(.), sd = ~sd(.)),
+                   .names = "{.col}_{.fn}"))
+
+# plot th relationship between bias and delta using density plots
+ggplot(summary_df, aes(x = delta_mean, y = bias_mean)) +
+  geom_point(aes(col = peak_coeff)) +
+  geom_hline(aes(yintercept = 0), col = "steelblue")+
+  labs(x = "Delta", y = "Bias") +
+  ggtitle("Relationship between Delta and Bias")
+
+
+ggplot(summary_df, aes(x = delta_mean, y = bias_mean)) +
+  geom_density_2d(aes(fill = ..level..), alpha = 0.6) +
+  geom_hline(yintercept = 0, col = "steelblue") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(x = "Delta", y = "Bias") +
+  ggtitle("Relationship between Delta and Bias using Density Plots")
+
+
+# Melting the summary_df for easier plotting
+melted_summary <- summary_df %>%
+  pivot_longer(cols = starts_with(predictors), names_to = "predictor", values_to = "value")
+
+ggplot(melted_summary, aes(x = value, y = bias_mean )) +
+  geom_violin() +
+  facet_wrap(~predictor, scales = "free_x")+
+  labs(x = "Predictor", y = "Bias") +
+  ggtitle("Distribution of Bias by Predictor")
+
+
+# Creating density distribution plots
+ggplot(melted_summary, aes(x = value, y = ..density.., fill = predictor)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~ predictor, scales = "free") +
+  labs(x = "Value", y = "Density", fill = "Predictor") +
+  ggtitle("Density Distribution of Bias by Predictor")
+
 
 
 # MODELLING -------------------------------------------------------------------
-model_df <- readRDS("analysis/simulation/data/model_df.rds")
+#model_df <- readRDS("analysis/simulation/data/model_df.rds")
 library(lme4)
-# Define the multilevel regression model
-model <- lmer(bias ~  delta + delta_outside_0 + n_groups + size + intro_n + r0 + GT_mean + GT_sd  + (1 | scenario/simulation/peak_coeff), data = model_df)
+
+model_formula <- "bias ~ size + delta + n_groups + (1 | scenario) + (1 | simulation)"
+model <- lmer(model_formula, data = model_df)
+model <- lmer(bias ~  delta  + n_groups + size + intro_n + r0 + GT_mean + GT_sd
+              + (1 | scenario/simulation/peak_coeff),
+              data = model_df)
+
+
+
 
 # Fit the model
 fit <- summary(model)
