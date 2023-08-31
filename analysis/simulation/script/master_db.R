@@ -12,7 +12,7 @@ output_dir <- here("analysis/simulation/data")
 dir.create(output_dir)
 
 # Database Connection
- db_conn <- dbConnect(RSQLite::SQLite(), dbname = "analysis/simulation/data/database.db")
+db_conn <- dbConnect(RSQLite::SQLite(), dbname = "analysis/simulation/data/database.db")
 
 # Unique Random Seed for the run
 if (dbExistsTable(db_conn, "run_details")) {
