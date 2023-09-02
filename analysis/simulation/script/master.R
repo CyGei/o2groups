@@ -9,8 +9,8 @@ dir.create(here("analysis/simulation/data", "logs"))
 
 
 # 0. Parameters --------------------------------------------------------------------------------------------
-n_scenarios <- 5
-n_simulations <- 10
+n_scenarios <- 5000
+n_simulations <- 100
 peak_coeffs <- seq(0.7, 1, 0.1)
 n_workers <- future::availableCores() - 1
 plan(multisession, workers = n_workers)

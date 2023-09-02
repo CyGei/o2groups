@@ -297,6 +297,55 @@ get_peak <- function(data) {
 }
 
 
+# Scale / Reverse - scale Delta ---------------------------------------------------
+#' Scale raw delta values.
+#'
+#' This function takes a numeric value 'raw_delta' and scales it by
+#' applying the formula: (raw_delta - 1) / (raw_delta + 1) for finite values,
+#' and returns 1.0 for Infinite values.
+#' 
+#' `raw_delta` is a non-negative real number constrained within the interval [0, ∞). 
+#' `raw_delta` < 1 indicates dissortativity.
+#' `raw_delta` > 1 indicates assortativity.
+#' `raw_delta` = 1 indicates neutrality.
+#' 
+#' `scaled_delta` is a real number constrained within the interval [-1, 1].
+#' `scaled_delta` < 0 indicates dissortativity.
+#' `scaled_delta` > 0 indicates assortativity.
+#' `scaled_delta` = 0 indicates neutrality.
+#' 
+#' @param raw_delta A numeric value to be scaled.
+#' @return The scaled delta value.
+#' @export
+scale <- function(raw_delta) {
+  scaled_delta <- ifelse(is.finite(raw_delta),
+              (raw_delta - 1) / (raw_delta + 1),
+              1.0)
+  return(scaled_delta)
+}
+
+#' Reverse the standardisation of delta.
+#'
+#' This function takes a scaled delta value 'scaled_delta' and reverses
+#' the standardisation by applying the formula: (1 + scaled_delta) / (1 - scaled_delta).
+#' 
+#' `scaled_delta` is a real number constrained within the interval [-1, 1].
+#' `scaled_delta` < 0 indicates dissortativity.
+#' `scaled_delta` > 0 indicates assortativity.
+#' `scaled_delta` = 0 indicates neutrality.
+#' 
+#' `raw_delta` is a non-negative real number constrained within the interval [0, ∞). 
+#' `raw_delta` < 1 indicates dissortativity.
+#' `raw_delta` > 1 indicates assortativity.
+#' `raw_delta` = 1 indicates neutrality.
+#'
+#' @param scaled_delta A scaled numeric value to be reversed.
+#' @return The original unscaled delta value.
+#' @export
+reverse_scale <- function(scaled_delta) {
+  raw_delta <- (1 + scaled_delta) / (1 - scaled_delta)
+  return(raw_delta)
+}
 
 # generate_sequences --------------------------------------------------------------------------
 
