@@ -9,7 +9,7 @@
 #'
 #' @return A data frame containing the delta estimates for each group and simulation.
 #'
-#' @export
+#' @keywords internal
 
 
 process_simulation <- function(simulation_data, peak_coeff, size, name) {

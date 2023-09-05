@@ -1,4 +1,11 @@
 library(tidyverse)
+library(here)
+library(future)
+library(furrr)
+plan(multisession, workers = future::availableCores()[[1]] - 2)
+
+# Helpers --------------------------------------------------------------------
+
 standardise <- function(x) {
   x <- as.numeric(x)
   d <- ifelse(is.finite(x),
@@ -15,41 +22,60 @@ reverse_standardise <- function(d) {
 normalise <- function(x) {
   (x - min(x)) / (max(x) - min(x))
 }
-# Scenarios ------------------------------------------------------------------
-scenarios <- readRDS("analysis/simulation/data/scenarios.rds")
 
-remove_obj <- function(scenario) {
-  scenario$generation_time <- NULL
-  scenario$incubation_period <- NULL
-  return(scenario)
+read_files <- function(path) {
+  files <- list.files(path = path, pattern = "*.rds", full.names = TRUE)
+  files <- furrr::future_map(files, readRDS, .options = furrr_options(seed = NULL))
+  return(files)
 }
 
-scenarios_df <- lapply(scenarios, remove_obj) %>%
-  tibble(scenarios = .) %>%
-  unnest_wider(col = scenarios) %>%
-  group_by(scenario) %>%
-  unnest(cols = c(name, size, delta, intro_n, r0)) %>%
-  ungroup() %>%
-  rename(group = name)
+remove_object <- function(list, object_name) {
+  list <- list[!names(list) %in% object_name]
+  return(list)
+}
+
+# Test --------------------------------------------------------------------
+# Verify that scenarios and results conform to basic tests
+source(here("analysis/simulation/script/test.R"))
 
 
-# Raw results -------------------------------------------------------------
-results_df <- readRDS("analysis/simulation/data/results.rds")
+# Data ----------------------------------------------------------------------
+scenarios_df <-
+  map(.x = scenarios,
+      ~ remove_object(.x,
+                      c("generation_time", "incubation_period", "duration", "delta"))) %>%
+  bind_rows() %>%
+  rename(delta = scaled_delta)
 
+results_df <- bind_rows(results)
 
-
-# Model Df ---------------------------------------------------------------
 model_df <-
-  merge(results_df,
+  left_join(results_df,
         scenarios_df,
-        by = c("scenario", "group"),
-        all.x = TRUE) %>%
-  arrange(as.integer(scenario), as.integer(simulation)) %>%
+        by = c("scenario", "name")) %>%
+  mutate(
+    across(
+      .cols = c("est", "lower_ci", "upper_ci"),
+      .names = "{.col}",
+      .fns = o2groups::scale
+    ),
+    bias = delta - est,
+    is_within_ci = ifelse(delta >= lower_ci &
+                            delta <= upper_ci,
+                          TRUE,
+                          FALSE),
+    significant_delta = ifelse(delta != 0, #this might never be equal to 0 with simulation data
+                             TRUE,
+                             FALSE),
+    significant_est = ifelse(lower_ci > 0 | upper_ci < 0,
+                           TRUE,
+                           FALSE)
+  ) %>%
   select(
     scenario,
     simulation,
     peak_coeff,
-    group,
+    name,
     n_groups,
     size,
     intro_n,
@@ -58,157 +84,139 @@ model_df <-
     GT_sd,
     INCUB_mean,
     INCUB_sd,
-    duration,
+    delta,
     est,
     lower_ci,
     upper_ci,
+    bias,
+    is_within_ci,
+    significant_delta,
+    significant_est,
     successes,
-    trials,
-    delta
-  ) %>%
-  mutate(
-    scenario = as.factor(scenario),
-    simulation = as.factor(simulation),
-    peak_coeff = as.factor(peak_coeff),
-    group = as.factor(group),
-    across(
-      .cols = c("delta", "est", "lower_ci", "upper_ci"),
-      .names = "{.col}",
-      .fns = standardise
-    ),
-    bias = delta - est,
-   # norm_bias = normalise(bias),
-    is_within_ci = ifelse(delta >= lower_ci &
-                            delta <= upper_ci,
-                          TRUE,
-                          FALSE),
-    delta_outside_0 = ifelse(delta != 0,
-                             TRUE,
-                             FALSE),
-    est_outisde_0 = ifelse(lower_ci > 0 | upper_ci < 0,
-                           TRUE,
-                           FALSE)
+    trials
   )
 
-
-#saveRDS(model_df, "analysis/simulation/data/model_df.rds")
-
-
-
-
-# VISU ----------------------------------------------------------------------------------------
-#model_df <- readRDS("analysis/simulation/data/model_df.rds")
-
-predictors <- c("delta", "n_groups", "size", "intro_n", "r0", "GT_mean", "GT_sd")
-plot_relationship <- function(predictor) {
-  # Aggregate data by the dependent variable and calculate mean bias
-  aggregated_data <- model_df %>%
-    group_by(peak_coeff, .data[[predictor]]) %>%
-    summarize(mean_bias = mean(bias))
-
-  # Create a scatter plot
-  ggplot(aggregated_data, aes(x = .data[[predictor]], y = mean_bias)) +
-    geom_point(aes(col = peak_coeff)) +
-    geom_hline(aes(yintercept = 0), col = "steelblue")+
-    labs(x = predictor, y = "Mean Bias") +
-    ggtitle(paste("Relationship between", predictor, "and Mean Bias"))
-}
-
-# plot all relationships using lapply
-lapply(predictors, plot_relationship)
-plot_relationship("r0")
+dir.create(here("analysis/simulation/data", "model"))
+library(data.table)
+fwrite(setDT(scenarios_df), here("analysis/simulation/data/model", "scenarios_df.csv"))
+fwrite(setDT(results_df), here("analysis/simulation/data/model", "results_df.csv"))
+fwrite(setDT(model_df), here("analysis/simulation/data/model", "model_df.csv"))
 
 
-library(corrplot)
-
-correlation_matrix <- cor(model_df[, c("bias", predictors)])
-corrplot(correlation_matrix, method = "color")
-
-
-
-
-# Modelling -----------------------------------------------------------------------------------
-
-predictors <- c("delta", "n_groups", "size", "intro_n", "r0", "GT_mean", "GT_sd")
-outcome <- "bias"
-summary_df <- model_df %>%
-  filter(as.numeric(scenario) <= 400) %>%
-  group_by(scenario, simulation, peak_coeff) %>%
-  summarise(across(all_of(c(predictors, outcome)), list(mean = ~mean(.), sd = ~sd(.)),
-                   .names = "{.col}_{.fn}"))
-
-# plot th relationship between bias and delta using density plots
-ggplot(summary_df, aes(x = delta_mean, y = bias_mean)) +
-  geom_point(aes(col = peak_coeff)) +
-  geom_hline(aes(yintercept = 0), col = "steelblue")+
-  labs(x = "Delta", y = "Bias") +
-  ggtitle("Relationship between Delta and Bias")
-
-
-ggplot(summary_df, aes(x = delta_mean, y = bias_mean)) +
-  geom_density_2d(aes(fill = ..level..), alpha = 0.6) +
-  geom_hline(yintercept = 0, col = "steelblue") +
-  scale_fill_gradient(low = "lightblue", high = "darkblue") +
-  labs(x = "Delta", y = "Bias") +
-  ggtitle("Relationship between Delta and Bias using Density Plots")
-
-
-# Melting the summary_df for easier plotting
-melted_summary <- summary_df %>%
-  pivot_longer(cols = starts_with(predictors), names_to = "predictor", values_to = "value")
-
-ggplot(melted_summary, aes(x = value, y = bias_mean )) +
-  geom_violin() +
-  facet_wrap(~predictor, scales = "free_x")+
-  labs(x = "Predictor", y = "Bias") +
-  ggtitle("Distribution of Bias by Predictor")
-
-
-# Creating density distribution plots
-ggplot(melted_summary, aes(x = value, y = ..density.., fill = predictor)) +
-  geom_density(alpha = 0.5) +
-  facet_wrap(~ predictor, scales = "free") +
-  labs(x = "Value", y = "Density", fill = "Predictor") +
-  ggtitle("Density Distribution of Bias by Predictor")
-
-
-
-# MODELLING -------------------------------------------------------------------
-#model_df <- readRDS("analysis/simulation/data/model_df.rds")
-library(lme4)
-
-model_formula <- "bias ~ size + delta + n_groups + (1 | scenario) + (1 | simulation)"
-model <- lmer(model_formula, data = model_df)
-model <- lmer(bias ~  delta  + n_groups + size + intro_n + r0 + GT_mean + GT_sd
-              + (1 | scenario/simulation/peak_coeff),
-              data = model_df)
-
-
-
-
-# Fit the model
-fit <- summary(model)
-
-# View the model summary
-print(fit)
-
-
-
-library(randomForest)
-# Convert factors to numeric for random forest
-model_df$scenario <- as.numeric(model_df$scenario)
-model_df$simulation <- as.numeric(model_df$simulation)
-model_df$peak_coeff <- as.numeric(model_df$peak_coeff)
-model_df$group <- as.numeric(model_df$group)
-
-# Define the Random Forest model
-rf_model <- randomForest(bias ~ delta + n_groups + size + intro_n + r0 + GT_mean + GT_sd, data = model_df)
-
-# View the model summary
-print(rf_model)
-summary(rf_model)
-
-# Feature importance plot
-varImpPlot(rf_model, main = "Variable Importance Plot")
-
+#
+# # VISU ----------------------------------------------------------------------------------------
+# #model_df <- readRDS("analysis/simulation/data/model_df.rds")
+#
+# predictors <- c("delta", "n_groups", "size", "intro_n", "r0", "GT_mean", "GT_sd")
+# plot_relationship <- function(predictor) {
+#   # Aggregate data by the dependent variable and calculate mean bias
+#   aggregated_data <- model_df %>%
+#     group_by(peak_coeff, .data[[predictor]]) %>%
+#     summarize(mean_bias = mean(bias))
+#
+#   # Create a scatter plot
+#   ggplot(aggregated_data, aes(x = .data[[predictor]], y = mean_bias)) +
+#     geom_point(aes(col = peak_coeff)) +
+#     geom_hline(aes(yintercept = 0), col = "steelblue")+
+#     labs(x = predictor, y = "Mean Bias") +
+#     ggtitle(paste("Relationship between", predictor, "and Mean Bias"))
+# }
+#
+# # plot all relationships using lapply
+# lapply(predictors, plot_relationship)
+# plot_relationship("r0")
+#
+#
+# library(corrplot)
+#
+# correlation_matrix <- cor(model_df[, c("bias", predictors)])
+# corrplot(correlation_matrix, method = "color")
+#
+#
+#
+#
+# # Modelling -----------------------------------------------------------------------------------
+#
+# predictors <- c("delta", "n_groups", "size", "intro_n", "r0", "GT_mean", "GT_sd")
+# outcome <- "bias"
+# summary_df <- model_df %>%
+#   filter(as.numeric(scenario) <= 400) %>%
+#   group_by(scenario, simulation, peak_coeff) %>%
+#   summarise(across(all_of(c(predictors, outcome)), list(mean = ~mean(.), sd = ~sd(.)),
+#                    .names = "{.col}_{.fn}"))
+#
+# # plot th relationship between bias and delta using density plots
+# ggplot(summary_df, aes(x = delta_mean, y = bias_mean)) +
+#   geom_point(aes(col = peak_coeff)) +
+#   geom_hline(aes(yintercept = 0), col = "steelblue")+
+#   labs(x = "Delta", y = "Bias") +
+#   ggtitle("Relationship between Delta and Bias")
+#
+#
+# ggplot(summary_df, aes(x = delta_mean, y = bias_mean)) +
+#   geom_density_2d(aes(fill = ..level..), alpha = 0.6) +
+#   geom_hline(yintercept = 0, col = "steelblue") +
+#   scale_fill_gradient(low = "lightblue", high = "darkblue") +
+#   labs(x = "Delta", y = "Bias") +
+#   ggtitle("Relationship between Delta and Bias using Density Plots")
+#
+#
+# # Melting the summary_df for easier plotting
+# melted_summary <- summary_df %>%
+#   pivot_longer(cols = starts_with(predictors), names_to = "predictor", values_to = "value")
+#
+# ggplot(melted_summary, aes(x = value, y = bias_mean )) +
+#   geom_violin() +
+#   facet_wrap(~predictor, scales = "free_x")+
+#   labs(x = "Predictor", y = "Bias") +
+#   ggtitle("Distribution of Bias by Predictor")
+#
+#
+# # Creating density distribution plots
+# ggplot(melted_summary, aes(x = value, y = ..density.., fill = predictor)) +
+#   geom_density(alpha = 0.5) +
+#   facet_wrap(~ predictor, scales = "free") +
+#   labs(x = "Value", y = "Density", fill = "Predictor") +
+#   ggtitle("Density Distribution of Bias by Predictor")
+#
+#
+#
+# # MODELLING -------------------------------------------------------------------
+# #model_df <- readRDS("analysis/simulation/data/model_df.rds")
+# library(lme4)
+#
+# model_formula <- "bias ~ size + delta + n_groups + (1 | scenario) + (1 | simulation)"
+# model <- lmer(model_formula, data = model_df)
+# model <- lmer(bias ~  delta  + n_groups + size + intro_n + r0 + GT_mean + GT_sd
+#               + (1 | scenario/simulation/peak_coeff),
+#               data = model_df)
+#
+#
+#
+#
+# # Fit the model
+# fit <- summary(model)
+#
+# # View the model summary
+# print(fit)
+#
+#
+#
+# library(randomForest)
+# # Convert factors to numeric for random forest
+# model_df$scenario <- as.numeric(model_df$scenario)
+# model_df$simulation <- as.numeric(model_df$simulation)
+# model_df$peak_coeff <- as.numeric(model_df$peak_coeff)
+# model_df$group <- as.numeric(model_df$group)
+#
+# # Define the Random Forest model
+# rf_model <- randomForest(bias ~ delta + n_groups + size + intro_n + r0 + GT_mean + GT_sd, data = model_df)
+#
+# # View the model summary
+# print(rf_model)
+# summary(rf_model)
+#
+# # Feature importance plot
+# varImpPlot(rf_model, main = "Variable Importance Plot")
+#
 

@@ -7,7 +7,7 @@
 #' @param min_t The minimum time for the window.
 #' @param max_t The maximum time for the window.
 #'
-#' @return A matrix representing the binomial mixing matrix with estimates, confidence intervals, successes, and trials.
+#' @return A matrix representing the binomial mixing matrix with estimates, confidence intervals, successes (within group transmission), and trials (total no of transmission).
 #'
 #' @importFrom stats binom.test
 #' @export

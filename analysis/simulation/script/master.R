@@ -8,16 +8,19 @@ subdirectories <- c("scenarios", "simulations", "results", "logs")
 purrr::walk(subdirectories, ~ dir.create(here::here("analysis/simulation/data", .x), recursive = TRUE))
 
 # 0. Parameters --------------------------------------------------------------------------------------------
-n_scenarios <- 5000
+n_scenarios <- 10000
 n_simulations <- 100
 peak_coeffs <- seq(0.7, 1, 0.1)
 
 # Seed for scenarios
 if (length(list.files(here("analysis/simulation/data/logs"), pattern = "log_")) > 0) {
-  log_files <- list.files(here("analysis/simulation/data/logs"), pattern = "log_")
-  log_files <- purrr::map(log_files, ~ readRDS(here("analysis/simulation/data/logs", .x)))
-  rseeds <- purrr::map(log_files, ~ .x$seed)
+  log_files <-
+    list.files(here("analysis/simulation/data/logs"), pattern = "log_")
+  log_files <-
+    purrr::map(log_files, ~ readRDS(here("analysis/simulation/data/logs", .x)))
+  rseeds <- purrr::map(log_files, ~ .x$rseed)
   rseed <- max(unlist(rseeds)) + 1
+  rm(list = c("rseeds", "log_files"))
 } else {
   rseed <- 1
 }
@@ -32,15 +35,20 @@ time_start <- format(Sys.time(), "%Y-%m-%d-%H:%M")
 source("analysis/simulation/script/generate_scenarios.R")
 scenarios <- generate_scenarios(n_scenarios, seed = rseed)
 for (i in 1:n_scenarios) {
-  saveRDS(scenarios[[i]], file = paste0(here("analysis/simulation/data", "scenarios"), "/", scenarios[[i]]$scenario, ".rds"))
+  saveRDS(scenarios[[i]], file = paste0(
+    here("analysis/simulation/data", "scenarios"),
+    "/",
+    scenarios[[i]]$scenario,
+    ".rds"
+  ))
 }
 
 
 # 2. Run & Process Simulations --------------------------------------------------------------------------------------------
-source(here("analysis/simulation/script/process_simulation.R"))
+source(here("analysis/simulation/script/process_simulations.R"))
 
 process_time <- system.time({
-  scenarios_results <- future_map(scenarios, function(scenario) {
+  furrr::future_walk(scenarios, function(scenario) {
     # Simulations
     simulations <- purrr::map(1:n_simulations, function(j) {
       sim <- simulate_groups(
@@ -61,12 +69,19 @@ process_time <- system.time({
 
     # Delta Estimates
     results <-
-      purrr::map(simulations,
-                 ~ process_simulation(.x, peak_coeffs, scenario))
+      process_simulations(simulations, peak_coeffs, scenario)
 
     # Write RDS files to respective folders
-    saveRDS(simulations, file.path(here("analysis/simulation/data"), "simulations", paste0(scenario$scenario, ".rds")))
-    saveRDS(results, file.path(here("analysis/simulation/data"), "results", paste0(scenario$scenario, ".rds")))
+    saveRDS(simulations, file.path(
+      here("analysis/simulation/data"),
+      "simulations",
+      paste0(scenario$scenario, ".rds")
+    ))
+    saveRDS(results, file.path(
+      here("analysis/simulation/data"),
+      "results",
+      paste0(scenario$scenario, ".rds")
+    ))
 
   }, .options = furrr_options(seed = NULL))
 
@@ -77,7 +92,8 @@ time_end <- format(Sys.time(), "%Y-%m-%d-%H:%M")
 time_start <- as.POSIXct(time_start, format = "%Y-%m-%d-%H:%M")
 time_end <- as.POSIXct(time_end, format = "%Y-%m-%d-%H:%M")
 total_time <- time_end - time_start
-scenarios_names <- lapply(scenarios, function(x) x$scenario)
+scenarios_names <- lapply(scenarios, function(x)
+  x$scenario)
 
 log <- list(
   time_start = as.character(time_start),
@@ -93,4 +109,13 @@ log <- list(
 )
 
 time_start <- format(time_start, "%Y-%m-%d-%H_%M")
-saveRDS(log, file = paste0(here("analysis/simulation/data", "logs"), "/log_", time_start, ".rds"))
+saveRDS(log, file = paste0(
+  here("analysis/simulation/data", "logs"),
+  "/log_",
+  time_start,
+  ".rds"
+))
+
+rm(list = ls())
+
+source(here("analysis/simulation/script/model_data.R"))
