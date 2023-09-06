@@ -117,5 +117,8 @@ saveRDS(log, file = paste0(
 ))
 
 rm(list = ls())
+gc()
 
+
+# Prepare data for modelling ----------------------------------------------
 source(here("analysis/simulation/script/model_data.R"))

@@ -2,7 +2,10 @@ library(tidyverse)
 library(here)
 library(future)
 library(furrr)
+library(purrr)
+library(skimr)
 plan(multisession, workers = future::availableCores()[[1]] - 2)
+source(here("analysis/simulation/script/test.R"))
 
 # Helpers --------------------------------------------------------------------
 
@@ -34,12 +37,13 @@ remove_object <- function(list, object_name) {
   return(list)
 }
 
-# Test --------------------------------------------------------------------
-# Verify that scenarios and results conform to basic tests
-source(here("analysis/simulation/script/test.R"))
-
 
 # Data ----------------------------------------------------------------------
+scenarios <- read_files(here("analysis/simulation/data", "scenarios"))
+results <- read_files(here("analysis/simulation/data", "results"))
+test_n_groups(scenarios, results, n_sample = 10)
+test_skim_output(scenarios, results, n_sample = 10)
+
 scenarios_df <-
   map(.x = scenarios,
       ~ remove_object(.x,
@@ -47,18 +51,18 @@ scenarios_df <-
   bind_rows() %>%
   rename(delta = scaled_delta)
 
-results_df <- bind_rows(results)
+results_df <- bind_rows(results) %>%
+  mutate(across(
+    .cols = c("est", "lower_ci", "upper_ci"),
+    .names = "{.col}",
+    .fns = o2groups::scale
+  ))
 
 model_df <-
   left_join(results_df,
         scenarios_df,
         by = c("scenario", "name")) %>%
   mutate(
-    across(
-      .cols = c("est", "lower_ci", "upper_ci"),
-      .names = "{.col}",
-      .fns = o2groups::scale
-    ),
     bias = delta - est,
     is_within_ci = ifelse(delta >= lower_ci &
                             delta <= upper_ci,
