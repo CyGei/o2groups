@@ -6,74 +6,14 @@ library(data.table)
 plan(multisession, workers = future::availableCores()[[1]] - 2)
 
 # Helpers -----------------------------------------------------------------
-plot_relationship <- function(predictor) {
-  # Aggregate data by the dependent variable and calculate mean bias
-  aggregated_data <- model_df %>%
-    group_by(peak_coeff, .data[[predictor]]) %>%
-    summarise(mean_bias = mean(bias))
-
-  # Create a scatter plot
-  ggplot(aggregated_data, aes(x = .data[[predictor]], y = mean_bias)) +
-    geom_point(aes(col = as.character(peak_coeff)), alpha = 0.6) +
-    geom_hline(aes(yintercept = 0), col = "steelblue") +
-    labs(x = predictor, y = "Mean Bias", col = "Peak Coeff") +
-    ggtitle(paste("Relationship between", predictor, "and Mean Bias"))
-}
-
-plot_freq <- function(x,
-                      y,
-                      x_breaks = NULL,
-                      y_breaks = NULL,
-                      x_length_out = 10,
-                      y_length_out = 10) {
-  if (is.null(x_breaks)) {
-    x_breaks <-
-      seq(min(outcomes[[x]], na.rm = TRUE),
-          max(outcomes[[x]], na.rm = TRUE),
-          length.out = x_length_out)
-  }
-  if (is.null(y_breaks)) {
-    y_breaks <-
-      seq(min(outcomes[[y]], na.rm = TRUE),
-          max(outcomes[[y]], na.rm = TRUE),
-          length.out = y_length_out)
-  }
-
-
-  plot <- outcomes %>%
-    select(x, y) %>%
-    mutate(
-      x_bin = cut(.data[[x]], breaks = x_breaks),
-      y_bin = cut(.data[[y]], breaks = y_breaks)
-    ) %>%
-    drop_na() %>%
-    count(x_bin, y_bin) %>%
-    group_by(x_bin) %>%
-    mutate(denom = sum(n),
-           freq = n / denom) %>%
-    ggplot(., aes(x = x_bin, y = y_bin)) +
-    geom_tile(aes(fill = freq),
-              col = "white") +
-    geom_label(aes(
-      x = x_bin,
-      y = -1,
-      label = scales::comma_format()(denom)
-    ),
-    vjust = -0.5) +
-    scale_fill_viridis_c() +
-    labs(x = paste(x, "Bin"),
-         y = paste(y, "Bin"),
-         fill = "Frequency") +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-  return(plot)
-}
+source(here("analysis/simulation/script/plot_helpers.R"))
 
 # Data --------------------------------------------------------------------
-scenarios_df <- fread(here("analysis/simulation/data/model", "scenarios_df.csv"))
+scenarios_df <-
+  fread(here("analysis/simulation/data/model", "scenarios_df.csv"))
 # model_df is the most granular data on simulation level
-model_df <- fread(here("analysis/simulation/data/model", "model_df.csv"))
+model_df <-
+  fread(here("analysis/simulation/data/model", "model_df.csv"))
 
 # Calculate coverage, bias, and significance aggregated over simulations
 outcomes <- model_df %>%
@@ -86,38 +26,106 @@ outcomes <- model_df %>%
   ungroup() %>%
   left_join(scenarios_df, by = c("scenario", "name"))
 
-predictors <- c("delta", "n_groups", "size", "intro_n", "r0", "GT_mean", "GT_sd", "trials")
+predictors <-
+  c("delta",
+    "n_groups",
+    "size",
+    "intro_n",
+    "r0",
+    "GT_mean",
+    "GT_sd",
+    "trials")
 
 
 
 # PLOTS -------------------------------------------------------------------
-plots <- predictors %>%
-  set_names() %>%
-  map(plot_relationship)
-
-ggplot(outcomes, aes(x = r0, y = bias)) +
-  geom_point() +
-  theme_minimal()
+plot_scatter(model_df,
+             x = "r0",
+             y = "bias",
+             facet_vars = "peak_coeff")
+plot_scatter(model_df,
+             x = "size",
+             y = "bias",
+             facet_vars = "peak_coeff")
 
 ggplot(outcomes, aes(x = r0, y = bias, fill = ..level..)) +
+  stat_density_2d(geom = "polygon") +
+  scale_fill_viridis_c() +
+  labs(x = "r0", y = "Bias")
+ggplot(outcomes, aes(x = size, y = bias, fill = ..level..)) +
   stat_density_2d(geom = "polygon") +
   scale_fill_viridis_c() +
   labs(x = "r0", y = "Bias")
 
 ggplot(model_df, aes(x = r0, y = bias)) +
   geom_hex(bins = 50) +
-  facet_wrap(~peak_coeff) +
   scale_fill_viridis_c() +
   theme_minimal()
 
-plot_freq("delta", "bias", x_breaks = seq(-1,1, 0.1), y_breaks = seq(-2, 2, 0.1))
-plot_freq("r0", "bias",x_length_out = 20, y_breaks = seq(-1, 1, 0.1))
-plot_freq("size", "bias", y_breaks = seq(-1, 1, 0.05), x_length_out = 80)
-plot_freq("n_groups", "bias", x_breaks = seq(1, 10, 1), y_breaks = seq(-1, 1, 0.1))
-plot_freq("significance", "bias", y_breaks = seq(-1, 1, 0.1), x_length_out = 20)
-plot_freq("coverage", "bias", x_breaks = seq(-1, 1, 0.1), y_breaks = seq(0.9, 1, 0.01))
-dbplot::dbplot_raster(outcomes, coverage, significance, fill = mean(delta), resolution = 50)
 
+
+plot_heatmap(
+  outcomes,
+  "delta",
+  "bias",
+  x_breaks = seq(-1, 1, 0.1),
+  y_breaks = seq(-2, 2, 0.1),
+  bin = FALSE
+)
+
+plot_heatmap(
+  model_df,
+  "delta",
+  "bias",
+  x_breaks = seq(-1, 1, 0.1),
+  y_breaks = seq(-2, 2, 0.1),
+  facet_vars = "peak_coeff",
+  bin = FALSE)+
+  geom_hline(aes(yintercept = 0), col = "grey", lty = "dashed")
+
+
+plot_heatmap(outcomes,
+          "r0",
+          "bias",
+          x_length_out = 20,
+          y_breaks = seq(-1, 1, 0.1))
+
+plot_heatmap(outcomes,
+             "size",
+             "bias",
+             y_breaks = seq(-1, 1, 0.05),
+             x_length_out = 100)
+
+plot_heatmap(
+  outcomes,
+  "n_groups",
+  "bias",
+  x_length_out = max(outcomes$n_groups, na.rm = TRUE),
+  y_breaks = seq(-1, 1, 0.1),
+  bin = FALSE
+)
+
+plot_heatmap(
+  outcomes,
+  "delta",
+  "significance",
+  x_breaks = seq(-1, 1, 0.05),
+  y_breaks = seq(0,1, 0.1),
+  facet_vars = "peak_coeff",
+  bin = TRUE,
+  min_alpha = 0.6)
+
+plot_scatter(outcomes,"delta","significance",facet_vars = "peak_coeff")
+
+
+# dbplot::dbplot_raster(outcomes,
+#                       coverage,
+#                       significance,
+#                       fill = mean(delta),
+#                       resolution = 50)
+
+
+# Correlations ------------------------------------------------------------
 
 corr <- outcomes %>%
   select(!c(scenario, name, peak_coeff)) %>%
@@ -138,7 +146,9 @@ ggcorrplot::ggcorrplot(
   method = "circle"
 )
 
-corrplot::corrplot(corr,
-  type = "upper", order = "hclust",
+corrplot::corrplot(
+  corr,
+  type = "upper",
+  order = "hclust",
   col = RColorBrewer::brewer.pal(n = 8, name = "RdYlBu")
 )

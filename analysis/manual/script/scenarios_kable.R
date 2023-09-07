@@ -1,6 +1,4 @@
 # Scenario Dataframe ------------------------------------------------------
-scenarios <- readRDS("analysis/data/scenarios.rds")
-
 # x is a distcrete object
 pmf_to_mu <- function(x) {
     sum(x$d(0:100) * (0:100))
@@ -9,6 +7,13 @@ pmf_to_sd <- function(x) {
     sqrt(sum(x$d(0:100) * (0:100)^2) - pmf_to_mu(x)^2)
 }
 
+read_files <- function(path) {
+  files <- list.files(path = path, pattern = "*.rds", full.names = TRUE)
+  files <- furrr::future_map(files, readRDS, .options = furrr_options(seed = NULL))
+  return(files)
+}
+
+scenarios <- read_files(here("analysis/manual/data", "scenarios"))
 
 # Create an empty data frame
 scenario_table <- data.frame()
@@ -22,6 +27,7 @@ for (scenario in scenarios) {
         size = paste0(scenario$size, collapse = ", "),
         name = paste0(scenario$name, collapse = ", "),
         delta = paste0(round(scenario$delta, digits = 2), collapse = ", "),
+        scaled_delta = paste0(round(o2groups::scale(scenario$delta), digits = 2), collapse = ", "),
         intro_group = paste0(scenario$intro_group, collapse = ", "),
         intro_n = paste0(scenario$intro_n, collapse = ", "),
         r0 = paste0(scenario$r0, collapse = ", "),
@@ -122,7 +128,7 @@ kbl <- scenario_table %>%
 
         # replace repeats within the cell
         across(
-            c(size, name, delta, intro_group, intro_n, r0),
+            c(size, name, delta, scaled_delta, intro_group, intro_n, r0),
             ~ replace_and_colorise(.)
         )
     ) %>%
@@ -141,7 +147,7 @@ kbl <- scenario_table %>%
     kableExtra::add_header_above(
         header = c(
             " " = 1,
-            "Group Parameters" = 7,
+            "Group Parameters" = 8,
             "Biological Parameters" = 2
         ),
         underline = TRUE,

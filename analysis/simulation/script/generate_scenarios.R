@@ -1,4 +1,4 @@
-
+library(noah)
 # Description ---------------------------------------------------------------------------------
 # This script generates scenarios random changes to the parameters (under various constraints)
 # It saves the scenarios in 2 formats: list and dataframe.
@@ -24,7 +24,7 @@ generate_scenarios_helper <- function() {
   for (i in seq_along(n_groups)) {
     intro_n[i] <- intro_n[i] + round(runif(1, min = 0, max = 0.1 * size[i]))
   }
- 
+
   r0 <- truncnorm::rtruncnorm(n_groups, a = 1, mean = 2, sd = 2)
 
   GT_mean <- truncnorm::rtruncnorm(1, a = 1, mean = 4, sd = 3)
@@ -59,18 +59,23 @@ generate_scenarios_helper <- function() {
 # Main function
 generate_scenarios <- function(n, seed = 123) {
   set.seed(seed)
-  # Create a list to store all scenarios
   scenarios <- vector("list", n)
-  pseudonyms <- paste0(ids::adjective_animal(n, max_len = 6), "_", format(Sys.time(), "%Y%m%d%H%M%S"))
+  ark = Ark$new(seed = seed)
+  pseudonyms <- paste0(noah::pseudonymize(as.integer(1:n), .ark = ark))
+
 
   for (i in 1:n) {
     scenario <- generate_scenarios_helper()
-    scenario$scenario <- pseudonyms[i]
+    scenario$scenario <-
+      paste0(
+        pseudonyms[i],
+        "_",
+        format(Sys.time(), "%Y%m%d%H%M%S")
+      )
     scenarios[[i]] <- scenario
   }
   return(scenarios)
 }
-
 
 # Function Call -------------------------------------------------------------------------------
 #
@@ -79,3 +84,28 @@ generate_scenarios <- function(n, seed = 123) {
 
 # Save Output ----------------------------------------------------------------------
 # saveRDS(scenarios, "analysis/simulation/data/scenarios.rds")
+
+
+
+# Draft to check for duplicates -------------------------------------------
+# # Check for duplicate pseudonyms and add an additive integer
+# pseudonym_counts <- table(pseudonyms)
+# duplicates <- pseudonyms[duplicated(pseudonyms)]
+# for (i in seq_along(pseudonyms)) {
+#   if (pseudonyms[i] %in% duplicates) {
+#     additive_integer <- pseudonym_counts[pseudonyms[i]]
+#     pseudonyms[i] <- paste0(pseudonyms[i], "_", additive_integer)
+#     pseudonym_counts[pseudonyms[i]] <- additive_integer + 1
+#   }
+#}
+
+# pseudonym_counts <- table(pseudonyms)
+# duplicates <- pseudonyms[duplicated(pseudonyms)]
+# pseudonyms <- purrr::map2(pseudonyms, pseudonym_counts, ~ {
+#   if (.x %in% duplicates) {
+#     additive_integer <- .y
+#     paste0(.x, "_", additive_integer)
+#   } else {
+#     .x
+#   }
+# })
