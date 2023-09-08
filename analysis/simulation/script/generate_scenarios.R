@@ -14,7 +14,19 @@ generate_scenarios_helper <- function() {
 
   name <- LETTERS[1:n_groups]
 
-  scaled_delta <- truncnorm::rtruncnorm(n_groups, a = -1, b = 1, mean = 0, sd = 0.35)
+  p_zero <- runif(n_groups, min = 0, max = 1)
+
+  scaled_delta <-
+    ifelse(p_zero > 0.5,
+      0,
+      truncnorm::rtruncnorm(
+        n_groups,
+        a = -1,
+        b = 1,
+        mean = 0,
+        sd = 0.35
+      )
+    )
 
   delta <- o2groups::reverse_scale(scaled_delta)
 
@@ -60,7 +72,7 @@ generate_scenarios_helper <- function() {
 generate_scenarios <- function(n, seed = 123) {
   set.seed(seed)
   scenarios <- vector("list", n)
-  ark = Ark$new(seed = seed)
+  ark <- Ark$new(seed = seed)
   pseudonyms <- paste0(noah::pseudonymize(as.integer(1:n), .ark = ark))
 
 
@@ -97,7 +109,7 @@ generate_scenarios <- function(n, seed = 123) {
 #     pseudonyms[i] <- paste0(pseudonyms[i], "_", additive_integer)
 #     pseudonym_counts[pseudonyms[i]] <- additive_integer + 1
 #   }
-#}
+# }
 
 # pseudonym_counts <- table(pseudonyms)
 # duplicates <- pseudonyms[duplicated(pseudonyms)]
