@@ -110,13 +110,15 @@ plot_heatmap <- function(df,
 plot_scatter <- function(df,
                          x,
                          y,
-                         facet_vars = NULL) {
+                         level_vars = c("scenario", "name"),
+                         facet_vars = NULL,
+                         alpha = 0.5) {
   aggregated_data <- df %>%
-    group_by(!!!syms(c(x, facet_vars))) %>%
+    group_by(!!!syms(c(x, level_vars, facet_vars))) %>%
     summarise(y = mean(!!!syms(y), na.rm = TRUE))
 
   plot <- ggplot(aggregated_data, aes(x = .data[[x]], y = y)) +
-    geom_point() +
+    geom_point(alpha = alpha) +
     labs(
       x = x,
       y = paste("Mean", y)

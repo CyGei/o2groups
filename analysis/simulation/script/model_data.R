@@ -68,8 +68,8 @@ model_df <-
                             delta <= upper_ci,
                           TRUE,
                           FALSE),
-    significant_delta = ifelse(delta != 0, #this might never be equal to 0 with simulation data
-                             TRUE,
+    significant_delta = ifelse(delta != 0, #this might never be equal to 0 with simulation data: modify this in generate_scenarios.R
+                             TRUE, # set probability of drawing 0 
                              FALSE),
     significant_est = ifelse(lower_ci > 0 | upper_ci < 0,
                            TRUE,
@@ -101,7 +101,7 @@ model_df <-
   )
 
 dir.create(here("analysis/simulation/data", "model"))
-library(data.table)
+library(data.table) #save to RDS instead
 fwrite(setDT(scenarios_df), here("analysis/simulation/data/model", "scenarios_df.csv"))
 fwrite(setDT(results_df), here("analysis/simulation/data/model", "results_df.csv"))
 fwrite(setDT(model_df), here("analysis/simulation/data/model", "model_df.csv"))

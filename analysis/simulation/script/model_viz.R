@@ -21,7 +21,9 @@ outcomes <- model_df %>%
   summarise(
     coverage = sum(is_within_ci) / n(),
     bias = mean(bias),
-    significance = sum(significant_est) / n()
+    #significance = sum(significant_est) / n()
+    significance = sum(significant_est == significant_delta) / n(), #significance should always be 1
+    trials = mean(trials, na.rm = TRUE)
   ) %>%
   ungroup() %>%
   left_join(scenarios_df, by = c("scenario", "name"))
@@ -34,34 +36,50 @@ predictors <-
     "r0",
     "GT_mean",
     "GT_sd",
+    "INCUB_mean",
+    "INCUB_sd",
     "trials")
+metrics <- c("coverage", "bias", "significance")
 
-
+# Pivot the dataframe into long format
+outcomes_long <- outcomes %>%
+  pivot_longer(cols = all_of(predictors),
+               names_to = "predictor_name",
+               values_to = "predictor_value") %>%
+  pivot_longer(cols = all_of(metrics),
+               names_to = "outcome_name",
+               values_to = "outcome_value")
 
 # PLOTS -------------------------------------------------------------------
+#https://github.com/plotly/rasterly
+outcomes_long %>%
+  filter(predictor_name %in% c("delta", "size", "r0", "GT_mean", "trials")) %>%
+  ggplot(aes(x = predictor_value , y = outcome_value)) +
+  geom_point(alpha = 0.2) + #aes(col = as.factor(peak_coeff)),
+  geom_smooth(se = FALSE)+
+  facet_grid(outcome_name ~ predictor_name , scales = "free") +
+  theme_classic() +
+  theme(legend.position = "bottom")
+
+
+formula <- y~x
 plot_scatter(model_df,
              x = "r0",
-             y = "bias",
-             facet_vars = "peak_coeff")
+             y = "bias")+
+  stat_smooth(method = "lm") +
+  ggpubr::stat_regline_equation(
+    aes(label =  paste(..eq.label.., "   ", ..adj.rr.label.., sep = "~")),
+    col = "steelblue")
+
+formula <- y ~ poly(x, 2, raw = TRUE)
 plot_scatter(model_df,
              x = "size",
-             y = "bias",
-             facet_vars = "peak_coeff")
-
-ggplot(outcomes, aes(x = r0, y = bias, fill = ..level..)) +
-  stat_density_2d(geom = "polygon") +
-  scale_fill_viridis_c() +
-  labs(x = "r0", y = "Bias")
-ggplot(outcomes, aes(x = size, y = bias, fill = ..level..)) +
-  stat_density_2d(geom = "polygon") +
-  scale_fill_viridis_c() +
-  labs(x = "r0", y = "Bias")
-
-ggplot(model_df, aes(x = r0, y = bias)) +
-  geom_hex(bins = 50) +
-  scale_fill_viridis_c() +
-  theme_minimal()
-
+             y = "bias")+
+  stat_smooth(method = "lm", formula = formula) +
+  ggpubr::stat_regline_equation(
+    aes(label =  paste(..eq.label.., "   ", ..adj.rr.label.., sep = "~")),
+    formula = formula,
+    col = "steelblue")
 
 
 plot_heatmap(
@@ -70,59 +88,11 @@ plot_heatmap(
   "bias",
   x_breaks = seq(-1, 1, 0.1),
   y_breaks = seq(-2, 2, 0.1),
-  bin = FALSE
+  bin = FALSE,
+  min_alpha = 0.8
 )
 
-plot_heatmap(
-  model_df,
-  "delta",
-  "bias",
-  x_breaks = seq(-1, 1, 0.1),
-  y_breaks = seq(-2, 2, 0.1),
-  facet_vars = "peak_coeff",
-  bin = FALSE)+
-  geom_hline(aes(yintercept = 0), col = "grey", lty = "dashed")
 
-
-plot_heatmap(outcomes,
-          "r0",
-          "bias",
-          x_length_out = 20,
-          y_breaks = seq(-1, 1, 0.1))
-
-plot_heatmap(outcomes,
-             "size",
-             "bias",
-             y_breaks = seq(-1, 1, 0.05),
-             x_length_out = 100)
-
-plot_heatmap(
-  outcomes,
-  "n_groups",
-  "bias",
-  x_length_out = max(outcomes$n_groups, na.rm = TRUE),
-  y_breaks = seq(-1, 1, 0.1),
-  bin = FALSE
-)
-
-plot_heatmap(
-  outcomes,
-  "delta",
-  "significance",
-  x_breaks = seq(-1, 1, 0.05),
-  y_breaks = seq(0,1, 0.1),
-  facet_vars = "peak_coeff",
-  bin = TRUE,
-  min_alpha = 0.6)
-
-plot_scatter(outcomes,"delta","significance",facet_vars = "peak_coeff")
-
-
-# dbplot::dbplot_raster(outcomes,
-#                       coverage,
-#                       significance,
-#                       fill = mean(delta),
-#                       resolution = 50)
 
 
 # Correlations ------------------------------------------------------------

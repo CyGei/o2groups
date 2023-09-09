@@ -1,6 +1,7 @@
 library(tidyverse)
 library(here)
 library(data.table)
+library(ggh4x)
 
 # Helpers -----------------------------------------------------------------
 source(here("analysis/manual/script/plot_helpers.R"))
@@ -59,7 +60,7 @@ grid_theme <- list(
     # editing strips
     strip.switch.pad.grid = unit(1, "cm"),
     strip.background.y = element_rect(fill = "#4C4E52", color = "#4C4E52"),
-    strip.background.x = element_rect(fill = NA, color = "#4C4E52"),
+    strip.background.x = element_rect(fill = "beige", color = "#4C4E52"),
     strip.text.y.left = element_text(
       margin = margin(1, 1, 1, 1, "cm"),
       angle = 0,
@@ -69,49 +70,43 @@ grid_theme <- list(
     strip.text.x = element_text(
       angle = 0,
       color = "black",
-      face = "italic",
+      face = "bold.italic",
       size = 10
     ),
     strip.placement = "outside",
     strip.clip = "off"
-  ),
-  ggplot2::labs(x = "", y = "")
+  )
 )
 
-library(ggh4x)
 
-design <- "
-  ABCD#
-  EFGHI
-  #JKL#
-"
+
+# BIAS --------------------------------------------------------------------
+#mean bias & 95% quantiles
 
 model_df %>%
   group_by(param, scenario, peak_coeff, name) %>%
   summarise(
-    mean_bias = mean(bias),
-    lower_ci = quantile(bias, 0.025),
-    upper_ci = quantile(bias, 0.975)
+    est = mean(bias),
+    lower = quantile(bias, 0.025),
+    upper = quantile(bias, 0.975)
   ) %>%
   ggplot(
     .,
     aes(
       x = name,
-      y = mean_bias,
+      y = est,
       color = as.factor(peak_coeff)
     )
   ) +
-  #facet_nested(~ param + scenario)+
   facet_nested_wrap(
     vars(param, scenario),
     nrow = length(unique(model_df$param))
-    #remove_labels = "x"
-  ) +
+    ) +
   theme(strip.placement = "outside") +
   geom_errorbar(
     aes(
-      ymin = lower_ci,
-      ymax = upper_ci
+      ymin = lower,
+      ymax = upper
     ),
     position = position_dodge(width = 0.9)
   ) +
@@ -122,6 +117,92 @@ model_df %>%
     color = "#3d3c3c"
   ) +
   scale_y_continuous(breaks = seq(-2, 2, 0.5), limits = c(-2, 2)) +
-  theme_bw()
+  theme_bw()+
+  labs(x = "", y = "Mean Bias - 95% Quantile Interval")+
+  grid_theme
 
 
+
+# COVERAGE ----------------------------------------------------------------
+# mean 95% coverage and 95% binom CI
+
+model_df %>%
+  group_by(param, scenario, peak_coeff, name) %>%
+  summarise(
+    est = binom.test(x = sum(is_within_ci), n = n())$est[[1]],
+    lower = binom.test(x = sum(is_within_ci), n = n())$conf.int[[1]],
+    upper = binom.test(x = sum(is_within_ci), n = n())$conf.int[[2]]
+  ) %>%
+  ggplot(
+    .,
+    aes(
+      x = name,
+      y = est,
+      color = as.factor(peak_coeff)
+    )
+  ) +
+  facet_nested_wrap(
+    vars(param, scenario),
+    nrow = length(unique(model_df$param))
+  ) +
+  theme(strip.placement = "outside") +
+  geom_errorbar(
+    aes(
+      ymin = lower,
+      ymax = upper
+    ),
+    position = position_dodge(width = 0.9)
+  ) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  geom_hline(
+    yintercept = 0.95,
+    lty = "solid",
+    color = "#3d3c3c"
+  ) +
+  scale_y_continuous(breaks = seq(0.5, 0.95, 0.15), limits = c(0, 1.1)) +
+  theme_bw()+
+  labs(x = "", y = "Coverage - 95% Binomial Interval")+
+  grid_theme
+
+
+
+
+# Significance ------------------------------------------------------------
+
+model_df %>%
+  mutate(assortative = case_when(
+    delta > 0 ~ "assortative",
+    delta < 0 ~ "dissortative",
+    TRUE ~ "neutral"
+  ) ) %>%
+  group_by(param, scenario, peak_coeff, name, assortative ) %>%
+  summarise(
+    est = binom.test(x = sum(significant_est), n = n())$est[[1]],
+    lower = binom.test(x = sum(significant_est), n = n())$conf.int[[1]],
+    upper = binom.test(x = sum(significant_est), n = n())$conf.int[[2]]) %>%
+  ggplot(
+    .,
+    aes(
+      x = name,
+      y = est,
+      color = as.factor(peak_coeff),
+      shape = assortative
+    )
+  ) +
+  facet_nested_wrap(
+    vars(param, scenario),
+    nrow = length(unique(model_df$param))
+  ) +
+  theme(strip.placement = "outside") +
+  geom_errorbar(
+    aes(
+      ymin = lower,
+      ymax = upper
+    ),
+    position = position_dodge(width = 0.9)
+  ) +
+  geom_point(position = position_dodge(width = 0.9)) +
+  scale_y_continuous(breaks = seq(0, 1, 0.2), limits = c(0, 1)) +
+  theme_bw()+
+  labs(x = "", y = "Coverage - 95% Binomial Interval")+
+  grid_theme
