@@ -13,11 +13,10 @@ n_simulations <- 100
 peak_coeffs <- seq(0.7, 1, 0.1)
 
 # Seed for scenarios
-if (length(list.files(here("analysis/simulation/data/logs"), pattern = "log_")) > 0) {
+log_files <- list.files(here("analysis/simulation/data"), pattern = "log_", recursive = TRUE)
+if (length(log_files) > 0) {
   log_files <-
-    list.files(here("analysis/simulation/data/logs"), pattern = "log_")
-  log_files <-
-    purrr::map(log_files, ~ readRDS(here("analysis/simulation/data/logs", .x)))
+    purrr::map(log_files, ~ readRDS(here("analysis/simulation/data", .x)))
   rseeds <- purrr::map(log_files, ~ .x$rseed)
   rseed <- max(unlist(rseeds)) + 1
   rm(list = c("rseeds", "log_files"))
