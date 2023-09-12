@@ -317,19 +317,21 @@ get_peak <- function(data) {
 #' @param raw_delta A numeric value to be scaled.
 #' @return The scaled delta value.
 #' @export
+
 scale <- function(raw_delta) {
-  if (is.infinite(raw_delta)) {
-    return(1)
-  } else if (is.na(raw_delta)) {
-    return(NA)
-  } else if (is.numeric(raw_delta) && is.finite(raw_delta)) {
-    scaled_delta <- (raw_delta - 1) / (raw_delta + 1)
-    return(scaled_delta)
-  } else {
-    # Handle other cases, e.g., non-numeric values
-    return(raw_delta)
-  }
+  result <- ifelse(is.infinite(raw_delta), 1,
+                   ifelse(
+                     is.na(raw_delta),
+                     NA,
+                     ifelse(
+                       is.numeric(raw_delta) & is.finite(raw_delta),
+                       (raw_delta - 1) / (raw_delta + 1),
+                       raw_delta
+                     )
+                   ))
+  return(result)
 }
+
 
 
 
