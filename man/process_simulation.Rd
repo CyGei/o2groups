@@ -21,3 +21,4 @@ A data frame containing the delta estimates for each group and simulation.
 \description{
 This function processes the results of a simulation by calculating delta estimates for each group and simulation based on the provided peak coefficient.
 }
+\keyword{internal}

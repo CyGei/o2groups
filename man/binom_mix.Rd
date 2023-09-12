@@ -14,7 +14,7 @@ binom_mix(data, min_t, max_t)
 \item{max_t}{The maximum time for the window.}
 }
 \value{
-A matrix representing the binomial mixing matrix with estimates, confidence intervals, successes, and trials.
+A matrix representing the binomial mixing matrix with estimates, confidence intervals, successes (within group transmission), and trials (total no of transmission).
 }
 \description{
 Computes a binomial mixing matrix from data based on the specified time window.
