@@ -284,14 +284,14 @@ get_si <- function(data) {
 get_peak <- function(data) {
   group_names <- unique(data$group)
   out <- vector("list", length(group_names))
-  
+
   for (i in seq_along(group_names)) {
     group_data <- data[data$group == group_names[i], "date_onset"]
     incid <- incidence::incidence(dates = group_data)
     peak <- incidence::estimate_peak(incid)
     out[[i]] <- round(peak$estimated)
   }
-  
+
   names(out) <- group_names
   return(out)
 }
@@ -303,42 +303,47 @@ get_peak <- function(data) {
 #' This function takes a numeric value 'raw_delta' and scales it by
 #' applying the formula: (raw_delta - 1) / (raw_delta + 1) for finite values,
 #' and returns 1.0 for Infinite values.
-#' 
-#' `raw_delta` is a non-negative real number constrained within the interval [0, ∞). 
+#'
+#' `raw_delta` is a non-negative real number constrained within the interval [0, ∞).
 #' `raw_delta` < 1 indicates dissortativity.
 #' `raw_delta` > 1 indicates assortativity.
 #' `raw_delta` = 1 indicates neutrality.
-#' 
+#'
 #' `scaled_delta` is a real number constrained within the interval [-1, 1].
 #' `scaled_delta` < 0 indicates dissortativity.
 #' `scaled_delta` > 0 indicates assortativity.
 #' `scaled_delta` = 0 indicates neutrality.
-#' 
+#'
 #' @param raw_delta A numeric value to be scaled.
 #' @return The scaled delta value.
 #' @export
 scale <- function(raw_delta) {
-  if (is.na(raw_delta) || !is.numeric(raw_delta)) {
+  if (is.infinite(raw_delta)) {
+    return(1)
+  } else if (is.na(raw_delta)) {
+    return(NA)
+  } else if (is.numeric(raw_delta) && is.finite(raw_delta)) {
+    scaled_delta <- (raw_delta - 1) / (raw_delta + 1)
+    return(scaled_delta)
+  } else {
+    # Handle other cases, e.g., non-numeric values
     return(raw_delta)
   }
-  
-  scaled_delta <- ifelse(is.finite(raw_delta),
-                         (raw_delta - 1) / (raw_delta + 1),
-                         1.0)
-  return(scaled_delta)
 }
+
+
 
 #' Reverse the standardisation of delta.
 #'
 #' This function takes a scaled delta value 'scaled_delta' and reverses
 #' the standardisation by applying the formula: (1 + scaled_delta) / (1 - scaled_delta).
-#' 
+#'
 #' `scaled_delta` is a real number constrained within the interval [-1, 1].
 #' `scaled_delta` < 0 indicates dissortativity.
 #' `scaled_delta` > 0 indicates assortativity.
 #' `scaled_delta` = 0 indicates neutrality.
-#' 
-#' `raw_delta` is a non-negative real number constrained within the interval [0, ∞). 
+#'
+#' `raw_delta` is a non-negative real number constrained within the interval [0, ∞).
 #' `raw_delta` < 1 indicates dissortativity.
 #' `raw_delta` > 1 indicates assortativity.
 #' `raw_delta` = 1 indicates neutrality.
