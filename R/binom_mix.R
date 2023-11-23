@@ -6,13 +6,14 @@
 #' @param data The input data frame containing the source_group and group columns.
 #' @param min_t The minimum time for the window.
 #' @param max_t The maximum time for the window.
+#' @param conf_level The confidence level for the CI.
 #'
 #' @return A matrix representing the binomial mixing matrix with estimates, confidence intervals, successes (within group transmission), and trials (total no of transmission).
 #'
 #' @importFrom stats binom.test
 #' @export
 
-binom_mix <- function(data, min_t, max_t) {
+binom_mix <- function(data, min_t, max_t, conf_level = 0.95) {
   #Filter data: bias in backward GT!
   df <-
     subset(
@@ -64,7 +65,8 @@ binom_mix <- function(data, min_t, max_t) {
 
   for (i in 1:ncol(counts)) {
     binom_result <- stats::binom.test(x = counts[i, i],
-                                      n = sum(counts[, i]))
+                                      n = sum(counts[, i]),
+                                      conf.level = conf_level)
     est <- binom_result$estimate[[1]]
     lower_ci <- binom_result$conf.int[1]
     upper_ci <- binom_result$conf.int[2]
