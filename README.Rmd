@@ -26,7 +26,7 @@ library(tidyverse)
 # Installation
 
 ```{r}
-devtools::install_github("CyGei/o2groups")
+#devtools::install_github("CyGei/o2groups")
 library(o2groups)
 library(tidyverse)
 ```
@@ -64,7 +64,7 @@ duration = 100 # the duration of the outbreak
 n_groups = 3 # the number of groups
 size = c(220, 200, 300) # the size of each group
 name = c("HCW", "Inpatient", "Outpatient")
-delta = o2groups::reverse_scale(c(0.5, 0.8, -0.5)) # the assortativity coefficient for each group
+delta = o2groups::reverse_scale(c(0.5, 0.75, -0.5)) # the assortativity coefficient for each group
 intro_n = c(1, 3, 1) # the number of introductions for each group
 r0 = c(1.7, 1.5, 3) # the basic reproduction number for each group
 generation_time = c(0, 0.1, 0.2, 0.4, 0.2, 0.1, 0) # the generation time distribution
@@ -118,7 +118,7 @@ We can estimate the assortativity coefficients using the `early_delta` function
 unscaled_est <- o2groups::early_delta(
   sim$data,
   min_t = 0,
-  max_t = 14, #~ epidemic peak date
+  max_t = 13, #~ epidemic peak date
   name = name,
   size = size
 )
@@ -127,7 +127,7 @@ unscaled_est # the estimated assortativity coefficients (gamma) and 95% CI for e
 
 ```
 We can plot the estimated assortativity coefficients and their 95% CI against the true values.
-We analysed transmission chains up to the epidemic peak, which is around day 14. 
+We analysed transmission chains up to the epidemic peak, which is around day 13. 
 
 
 ```{r}
@@ -217,4 +217,4 @@ delta_est_over_time %>%
   
 ```
 
-Our estimates are best around day 20, which is slightly after the epidemic peak. However, past that date, the depletion of susceptibles leads to a decrease in the observed proportion of within-group transmissions, which can lead to biased estimates of the true assortativity coefficients (dashed lines).
+The plot above highlights how the changes in the observed proportion of within-group transmissions ( due to saturation) can lead to biased estimates of the true assortativity coefficients (dashed lines).

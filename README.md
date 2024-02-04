@@ -21,8 +21,18 @@ The package is still under development and is not yet available on CRAN.
 # Installation
 
 ``` r
-devtools::install_github("CyGei/o2groups")
+#devtools::install_github("CyGei/o2groups")
 library(o2groups)
+```
+
+    ## 
+    ## Attaching package: 'o2groups'
+
+    ## The following object is masked from 'package:base':
+    ## 
+    ##     scale
+
+``` r
 library(tidyverse)
 ```
 
@@ -82,7 +92,7 @@ duration = 100 # the duration of the outbreak
 n_groups = 3 # the number of groups
 size = c(220, 200, 300) # the size of each group
 name = c("HCW", "Inpatient", "Outpatient")
-delta = o2groups::reverse_scale(c(0.5, 0.8, -0.5)) # the assortativity coefficient for each group
+delta = o2groups::reverse_scale(c(0.5, 0.75, -0.5)) # the assortativity coefficient for each group
 intro_n = c(1, 3, 1) # the number of introductions for each group
 r0 = c(1.7, 1.5, 3) # the basic reproduction number for each group
 generation_time = c(0, 0.1, 0.2, 0.4, 0.2, 0.1, 0) # the generation time distribution
@@ -150,7 +160,7 @@ function
 unscaled_est <- o2groups::early_delta(
   sim$data,
   min_t = 0,
-  max_t = 14, #~ epidemic peak date
+  max_t = 13, #~ epidemic peak date
   name = name,
   size = size
 )
@@ -158,14 +168,14 @@ unscaled_est <- o2groups::early_delta(
 unscaled_est # the estimated assortativity coefficients (gamma) and 95% CI for each group
 ```
 
-    ##                   est  lower_ci  upper_ci successes trials
-    ## HCW        10.0000000 3.6951009 33.802305        22     27
-    ## Inpatient   8.2727273 4.1067540 18.057645        35     46
-    ## Outpatient  0.6222222 0.2871452  1.270183        12     39
+    ##                  est  lower_ci  upper_ci successes trials
+    ## HCW        3.0303030 1.1718756  8.143221        12     21
+    ## Inpatient  8.6666667 4.4574930 18.147532        40     52
+    ## Outpatient 0.4454545 0.1607295  1.079633         7     29
 
 We can plot the estimated assortativity coefficients and their 95% CI
 against the true values. We analysed transmission chains up to the
-epidemic peak, which is around day 14.
+epidemic peak, which is around day 13.
 
 ``` r
 o2groups::scale(unscaled_est[,1:3]) %>% 
@@ -265,8 +275,6 @@ delta_est_over_time %>%
 
 ![](README_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
-Our estimates are best around day 20, which is slightly after the
-epidemic peak. However, past that date, the depletion of susceptibles
-leads to a decrease in the observed proportion of within-group
-transmissions, which can lead to biased estimates of the true
-assortativity coefficients (dashed lines).
+The plot above highlights how the changes in the observed proportion of
+within-group transmissions ( due to saturation) can lead to biased
+estimates of the true assortativity coefficients (dashed lines).
