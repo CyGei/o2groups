@@ -4,20 +4,20 @@
 \alias{get_stats}
 \title{Calculate statistics for each group over time}
 \usage{
-get_stats(data, t, n_groups, name, size, groupFOI, dt)
+get_stats(data, t, group_n, name, size, groupFOI, dt)
 }
 \arguments{
 \item{data}{A dataframe from simulate_groups().}
 
 \item{t}{The time point.}
 
-\item{n_groups}{The number of groups.}
+\item{group_n}{The number of groups.}
 
-\item{name}{A character vector of length n_groups specifying the names of the groups.}
+\item{name}{A character vector of length group_n specifying the names of the groups.}
 
-\item{size}{A numeric vector of length n_groups specifying the size of each group.}
+\item{size}{A numeric vector of length group_n specifying the size of each group.}
 
-\item{groupFOI}{A numeric vector of length n_groups specifying the FOI that each group receives at time t.}
+\item{groupFOI}{A numeric vector of length group_n specifying the FOI that each group receives at time t.}
 
 \item{dt}{A numeric value specifying the time interval between timesteps.}
 }
