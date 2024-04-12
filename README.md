@@ -9,12 +9,13 @@ and patients or specific age groups.
 
 We developed an estimator that utilises information on transmission
 chains (who infected whom), enabling the identification and
-quantification of transmission patterns between groups.
+quantification of transmission patterns between groups (see package
+`linktree`)
 
 The `o2groups` package provides a framework for simulating outbreaks
 using branching processes specifically designed for scenarios involving
 multiple groups with various transmission assortativity coefficients
-(`delta`).
+(`gamma`).
 
 The package is still under development and is not yet available on CRAN.
 
@@ -23,17 +24,6 @@ The package is still under development and is not yet available on CRAN.
 ``` r
 #devtools::install_github("CyGei/o2groups")
 library(o2groups)
-```
-
-    ## 
-    ## Attaching package: 'o2groups'
-
-    ## The following object is masked from 'package:base':
-    ## 
-    ##     scale
-
-``` r
-library(tidyverse)
 ```
 
 # The assortativity coefficient
@@ -51,35 +41,6 @@ another group. Conversely, a $\gamma$ of 1/2 means that an infected
 individual from group a is twice as likely to infect an individual from
 another group compared to an individual from the same group.
 
-To simplify interpretation, we introduce a rescaled parameter $\delta$,
-ranging between -1 (fully disassortative) and 1 (fully assortative),
-with 0 corresponding to a homogeneous transmission pattern.
-
-To convert $\gamma$ to $\delta$ (or vice versa), we use the following
-function:
-
-``` r
-  gamma_values <- c(2, 1, 1/2)
-  delta <- o2groups::scale(gamma_values)
-  delta
-```
-
-    ## [1]  0.3333333  0.0000000 -0.3333333
-
-``` r
-  gamma <- o2groups::reverse_scale(delta)
-  gamma
-```
-
-    ## [1] 2.0 1.0 0.5
-
-``` r
-  # Plot the relationship between gamma and delta
-  plot(seq(0, 100, 0.1), o2groups::scale(seq(0, 100, 0.1)), type = "l", xlab = "gamma", ylab = "delta")
-```
-
-![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
-
 # Example
 
 ## Simulation
@@ -88,16 +49,15 @@ We first specify the input parameters for our simulation.
 
 ``` r
 set.seed(123)
-duration = 100 # the duration of the outbreak
-n_groups = 3 # the number of groups
-size = c(220, 200, 300) # the size of each group
-name = c("HCW", "Inpatient", "Outpatient")
-delta = o2groups::reverse_scale(c(0.5, 0.75, -0.5)) # the assortativity coefficient for each group
-intro_n = c(1, 3, 1) # the number of introductions for each group
-r0 = c(1.7, 1.5, 3) # the basic reproduction number for each group
-generation_time = c(0, 0.1, 0.2, 0.4, 0.2, 0.1, 0) # the generation time distribution
-incubation_period = round(rgamma(1000, shape = 2, scale = 1.5) # random values for the incubation period
-) 
+duration = 100
+group_n = 2
+size = c(100, 400)
+name = c("HCW", "patient")
+gamma = c(2, 0.8)
+intro_n = c(1, 3) 
+r0 = c(1.7, 2) 
+generation_time = c(0, 0.1, 0.2, 0.4, 0.2, 0.1, 0) 
+incubation_period = sample(1:14, sum(size), replace = TRUE) 
 ```
 
 We then run the outbreak simulation using the `simulate_groups`
@@ -107,174 +67,60 @@ function.
 set.seed(123)
 sim <- simulate_groups(
   duration = duration,
-  n_groups = n_groups,
+  group_n = group_n,
   size = size,
   name = name,
-  delta = delta,
+  gamma = gamma,
   intro_n = intro_n,
   r0 = r0,
   generation_time = generation_time,
   incubation_period = incubation_period
 )
+head(sim)
 ```
 
-## Visualisation of the outbreak
-
-We can first visualise the transmisson tree using the `plot_tree`
-function.
+    ##     group     id source source_group date_infection date_onset
+    ## 1     HCW HmPsw2   <NA>         <NA>              0          1
+    ## 2 patient WtYSxS   <NA>         <NA>              0         14
+    ## 3 patient gZ6tF2   <NA>         <NA>              0          4
+    ## 4 patient Kxtgdz   <NA>         <NA>              0          7
+    ## 5 patient aH9xtg Kxtgdz      patient              1         12
+    ## 6     HCW DJE8PP gZ6tF2      patient              2          5
 
 ``` r
-# Plot tree
-o2groups::plot_tree(sim$data, pal = c("HCW" = "red3", "Inpatient" = "green4", "Outpatient" = "steelblue"))
+library(epicontacts)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+    ## 
+    ## Attaching package: 'epicontacts'
 
-As well as the incidence and proportion of susceptibles over time using
-the `plot_stats` function.
+    ## The following object is masked _by_ '.GlobalEnv':
+    ## 
+    ##     sim
 
 ``` r
-# Plot incidence
-o2groups::plot_stats(sim$stats)[1] # peak around day 14
+x <- make_epicontacts(linelist = sim[, c("id", "group", "date_onset")],
+                      contacts = sim[, c("source_group","source", "id")],
+                      id = "id",
+                      from = "source",
+                      to = "id",
+                      directed = TRUE)
 ```
 
-    ## [[1]]
-
-![](README_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
-
-``` r
-# Plot proportion of susceptibles
-o2groups::plot_stats(sim$stats)[2]
-```
-
-    ## [[1]]
-
-![](README_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->
-
-## Estimation of the assortativity coefficients
-
-We can estimate the assortativity coefficients using the `early_delta`
-function
+    ## Warning in make_epicontacts(linelist = sim[, c("id", "group", "date_onset")], :
+    ## 4 NA IDs in the contacts have been renamed NA_1 to NA_4
 
 ``` r
-unscaled_est <- o2groups::early_delta(
-  sim$data,
-  min_t = 0,
-  max_t = 13, #~ epidemic peak date
-  name = name,
-  size = size
+p = vis_epicontacts(
+  x,
+  node_color = "group",
+  edge_color = "source_group",
+  node_shape = "group",
+  shapes = c(HCW = "stethoscope",
+             patient = "user"),
+  edge_col_pal = c(HCW = "orange",
+                   patient = "purple"),
 )
-
-unscaled_est # the estimated assortativity coefficients (gamma) and 95% CI for each group
 ```
 
-    ##                  est  lower_ci  upper_ci successes trials
-    ## HCW        3.0303030 1.1718756  8.143221        12     21
-    ## Inpatient  8.6666667 4.4574930 18.147532        40     52
-    ## Outpatient 0.4454545 0.1607295  1.079633         7     29
-
-We can plot the estimated assortativity coefficients and their 95% CI
-against the true values. We analysed transmission chains up to the
-epidemic peak, which is around day 13.
-
-``` r
-o2groups::scale(unscaled_est[,1:3]) %>% 
-  as.data.frame() %>%
-  rownames_to_column(var = "group") %>%
-  ggplot(aes(x = group, y = est, col = group)) +
-  geom_pointrange(aes(ymin = lower_ci  , ymax = upper_ci),
-                  size = 1) +
-  geom_hline(yintercept = 0, linetype = "dashed")+
-  geom_point(
-    data = tibble(est = o2groups::scale(delta), group = name),
-    col = "black",
-    shape = 18,
-    size = 5
-  ) +
-  theme_bw() +
-  theme(legend.position = "none") +
-  labs(
-    title = "Estimated (colour) vs true (black) assortativity coefficients",
-    x = "Group",
-    y = "Estimate & 95% CI"
-  )
-```
-
-![](README_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
-
-## Determining the right time window
-
-The assortativity coefficient is determined by the observed proportion
-of within-group transmissions and the size of each group.
-
-As the epidemic progresses, the proportion of within-group transmissions
-is expected to change due to saturation (i.e. the depletion of
-susceptibles). We can visualise the change in the observed proportion of
-within-group transmissions over time using the `binom_mix` function with
-different time windows.
-
-``` r
-prop_over_time <- lapply(1:max(sim$data$date_onset), function(max_time) {
-  o2groups::binom_mix(sim$data,
-                      min_t = 1,
-                      max_t = max_time,
-                      conf_level = 0.95) %>% 
-    as.data.frame() %>% rownames_to_column(var = "group") %>% 
-    mutate(max_time = max_time)
-}) %>% bind_rows()
-
-prop_over_time %>% 
-  drop_na() %>%
-  ggplot(aes(x = max_time, y = est)) +
-  geom_line(aes(col = group)) +
-  geom_ribbon(aes(ymin = lower_ci, ymax = upper_ci , fill = group), alpha = 0.2) +
-  scale_color_manual(values = c("red3", "green4", "steelblue")) +
-  labs(x = "Time", y = "Proportion of within-group transmissions",
-       title = "Proportion of within-group transmissions over time") +
-  theme_bw()
-```
-
-![](README_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
-
-As we analyse transmission chains over time, the sample size (i.e. the
-number of transmission events) increases, leading to narrower confidence
-intervals. Additionally, the observed proportion of within-group
-transmissions changes due to saturation.
-
-We can see how the estimated assortativity coefficients by estimating
-the assortativity coefficients over time.
-
-``` r
-delta_est_over_time <- lapply(1:max(sim$data$date_onset), function(max_time) {
-  o2groups::early_delta(sim$data,
-                        min_t = 1,
-                        max_t = max_time,
-                        name = name,
-                        size = size) %>% 
-    as.data.frame() %>% rownames_to_column(var = "group") %>% 
-    mutate(max_time = max_time,
-           across(c(est, lower_ci, upper_ci), o2groups::scale))
-}) %>% bind_rows()
-
-
-delta_est_over_time %>%
-  drop_na() %>%
-  ggplot(aes(x = max_time, y = est)) +
-  geom_line(aes(col = group)) +
-  geom_ribbon(aes(ymin = lower_ci, ymax = upper_ci , fill = group), alpha = 0.2) +
-  geom_hline(# true delta
-    data = tibble(truth = o2groups::scale(delta), 
-                  group = name),
-    aes(yintercept = truth, col = group),
-    lty = "dashed") +
-  scale_color_manual(values = c("red3", "green4", "steelblue")) +
-  labs(x = "Time", y = "Assortativity coefficient",
-       title = "Estimated assortativity coefficients (ribbon) over time vs truth (dashed lines)") +
-  theme_bw()
-```
-
-![](README_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
-
-The plot above highlights how the changes in the observed proportion of
-within-group transmissions ( due to saturation) can lead to biased
-estimates of the true assortativity coefficients (dashed lines).
+![](README_files/figure-gfm/p.png)

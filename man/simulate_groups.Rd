@@ -6,11 +6,11 @@
 \usage{
 simulate_groups(
   duration = 100,
-  n_groups,
+  group_n,
   size,
-  name = NULL,
-  delta = rep(1, n_groups),
-  intro_n = NULL,
+  name,
+  gamma,
+  intro_n,
   r0,
   generation_time,
   incubation_period = NULL,
@@ -21,13 +21,13 @@ simulate_groups(
 \arguments{
 \item{duration}{An integer value representing the duration of the simulation}
 
-\item{n_groups}{An integer value representing the number of groups}
+\item{group_n}{An integer value representing the number of groups}
 
 \item{size}{A vector of integers representing the sizes of each group}
 
 \item{name}{A vector of characters representing the names of each group}
 
-\item{delta}{A numeric vector representing the within-group transmission factor (assortativity coefficient) for each group}
+\item{gamma}{A numeric vector representing the within-group transmission factor (assortativity coefficient) for each group}
 
 \item{intro_n}{A vector of n introductions respective to each group.}
 
@@ -50,13 +50,13 @@ Simulate the spread of an infectious disease among multiple groups
 \examples{
 simulate_groups(
   duration = 100,
-  n_groups = 3,
+  group_n = 3,
   size = c(100, 50, 200),
   name = c("A", "B", "C"),
-  delta = c(1, 2, 5),
+  gamma = c(1, 2, 5),
   intro_n = c(0, 7, 5),
   r0 = c(2, 3, 4),
-  generation_time = c(0.1, 0.3, 0.4, 0.2))
-
+  generation_time = c(0.1, 0.3, 0.4, 0.2)
+)
 
 }

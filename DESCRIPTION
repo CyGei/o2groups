@@ -11,17 +11,8 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
 Imports:
   stats,
-  purrr,
   simulacr,
-  dplyr,
-  tibble,
-  patchwork,
-  testthat,
-  incidence
-Suggests:
-  ggplot2,
-  plotly,
-  future,
+  purrr,
   furrr,
-  epitrix,
-  EpiEstim
+  testthat
+Suggests:

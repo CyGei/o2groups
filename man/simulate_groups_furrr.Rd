@@ -8,7 +8,7 @@ simulate_groups_furrr(
   n_simulations,
   n_cores = as.integer(future::availableCores() - 1),
   duration,
-  n_groups,
+  group_n,
   size,
   name,
   delta,
@@ -27,7 +27,7 @@ simulate_groups_furrr(
 
 \item{duration}{An integer value representing the duration of the simulation.}
 
-\item{n_groups}{An integer value representing the number of groups.}
+\item{group_n}{An integer value representing the number of groups.}
 
 \item{size}{A vector of integers representing the sizes of each group.}
 
@@ -60,7 +60,7 @@ simulate_groups_furrr(
   n_simulations = 20,
   n_cores = 5,
   duration = 100,
-  n_groups = 3,
+  group_n = 3,
   size = c(100, 50, 200),
   name = c("A", "B", "C"),
   delta = c(1, 2, 5),
