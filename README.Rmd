@@ -6,7 +6,6 @@ output:
 
 [![CRAN_Status_Badge](http://www.r-pkg.org/badges/version/o2groups)](https://cran.r-project.org/package=o2groups)
 
-
 # Overview
 
 Effective outbreak control relies on a comprehensive understanding of how diseases spread between affected groups, such as healthcare workers and patients or specific age groups.
@@ -15,8 +14,7 @@ We developed an estimator that utilises information on transmission chains (who 
 
 The `o2groups` package provides a framework for simulating outbreaks using branching processes specifically designed for scenarios involving multiple groups with various transmission assortativity coefficients (`gamma`).
 
-The package is still under development and is not yet available on CRAN. 
-
+The package is still under development and is not yet available on CRAN.
 
 ```{r setup, include=FALSE}
 #knitr::opts_chunk$set(echo = FALSE)
@@ -26,12 +24,12 @@ The package is still under development and is not yet available on CRAN.
 
 ```{r}
 #devtools::install_github("CyGei/o2groups")
-#library(o2groups)
+library(o2groups)
 ```
 
 # The assortativity coefficient
-By quantifying the extent to which individuals transmit infections within their own groups, assortativity coefficients offer a means to measure the relative contributions of different groups to transmission. 
-$\gamma$  is defined as the excess probability of a secondary infection taking place within group a compared to random expectations. $\gamma$  values range from 0 (fully disassortative) to ∞ (fully assortative), with 1 indicating homogeneous patterns. For instance, $\gamma$  = 2 indicates that an infected individual from group a is twice as likely to infect an individual from the same group compared to an individual from another group. Conversely, a $\gamma$  of 1/2  means that an infected individual from group a is twice as likely to infect an individual from another group compared to an individual from the same group. 
+
+By quantifying the extent to which individuals transmit infections within their own groups, assortativity coefficients offer a means to measure the relative contributions of different groups to transmission. $\gamma$ is defined as the excess probability of a secondary infection taking place within group a compared to random expectations. $\gamma$ values range from 0 (fully disassortative) to ∞ (fully assortative), with 1 indicating homogeneous patterns. For instance, $\gamma$ = 2 indicates that an infected individual from group a is twice as likely to infect an individual from the same group compared to an individual from another group. Conversely, a $\gamma$ of 1/2 means that an infected individual from group a is twice as likely to infect an individual from another group compared to an individual from the same group.
 
 # Example
 
@@ -79,7 +77,7 @@ x <- make_epicontacts(linelist = sim[, c("id", "group", "date_onset")],
                       to = "id",
                       directed = TRUE)
 
-vis_epicontacts(
+p = vis_epicontacts(
   x,
   node_color = "group",
   edge_color = "source_group",
@@ -91,3 +89,5 @@ vis_epicontacts(
 )
 
 ```
+
+![](README_files/figure-gfm/p.png)
