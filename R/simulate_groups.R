@@ -14,7 +14,7 @@
 #' @param dt The time step of the simulation (default = 1 day)
 #' @param quietly Logical. Whether to print progress or not. Default is TRUE (doesn't print progress).
 #'
-#' @return A list containing the individual linelist, the summary statistics per time step & input matrices (Mcol/M0).
+#' @return The transmission tree (data.frame) informing who infected whom and when.
 #'
 #' @export
 #'

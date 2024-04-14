@@ -113,36 +113,37 @@ generate_new_cases <- function(data, t, sources) {
 
 #' simulate_groups_furrr
 #'
-#' Simulate multiple outbreaks in parallel. A furrr wrapper for `simulate_groups`.
+#' Simulate the spread of an infectious disease among multiple groups in parallel.
 #'
-#' @param n_simulations The number of simulations to run.
-#' @param n_cores The number of cores to use in parallel. Default is as.integer(future::availableCores() - 1).
-#' @param duration An integer value representing the duration of the simulation.
-#' @param group_n An integer value representing the number of groups.
-#' @param size A vector of integers representing the sizes of each group.
-#' @param name A vector of characters representing the names of each group.
-#' @param delta A numeric vector representing the within-group transmission factor (assortativity coefficient) for each group.
-#' @param intro_n A vector of integers representing the number of introductions for each group.
-#' @param r0 A numeric vector representing the basic reproductive number (R0) for each group.
-#' @param generation_time The probability mass function (pmf) of the generation time.
+#' @param sim_n The number of simulations to run.
+#' @param core_n The number of cores to use in parallel. Default is as.integer(future::availableCores() - 1).
+#' @param duration An integer value representing the duration of the simulation
+#' @param group_n An integer value representing the number of groups
+#' @param size A vector of integers representing the sizes of each group
+#' @param name A vector of characters representing the names of each group
+#' @param gamma A numeric vector representing the within-group transmission factor (assortativity coefficient) for each group
+#' @param intro_n A vector of n introductions respective to each group.
+#' @param r0 A numeric vector representing the basic reproductive number (R0) for each group
+#' @param generation_time The probability mass function (pmf) of the generation time (sums to 1).
 #' @param incubation_period Optional. A vector of integers that will be sampled with replacement.
-#' @param dt The time step of the simulation (default = 1 day).
-#' @param stack Logical. If TRUE, returns a stacked dataframe by simulation ID else returns a list of `simulate_groups()` outputs. Default is TRUE.
-#'
-#' @return A list containing data frames with information about the simulated groups and the statistics of the simulation & matrices inputs (Mcol/M0).
+#' @param dt The time step of the simulation (default = 1 day)
+#' @param quietly Logical. Whether to print progress or not. Default is TRUE (doesn't print progress).
+
+#' @return A list of transmission trees (data.frame) informing who infected whom and when.
+
 #' @export
 #'
 #' @examples
 #' \dontrun{
 #' library(furrr)
 #' simulate_groups_furrr(
-#'   n_simulations = 20,
-#'   n_cores = 5,
+#'   sim_n = 20,
+#'   core_n = 5,
 #'   duration = 100,
 #'   group_n = 3,
 #'   size = c(100, 50, 200),
 #'   name = c("A", "B", "C"),
-#'   delta = c(1, 2, 5),
+#'   gamma = c(1, 2, 5),
 #'   intro_n = c(7, 5),
 #'   r0 = c(2, 3, 4),
 #'   generation_time = c(0.1, 0.3, 0.4, 0.2))
@@ -151,30 +152,29 @@ generate_new_cases <- function(data, t, sources) {
 #'
 
 
-simulate_groups_furrr <- function(n_simulations,
-                                  n_cores = as.integer(future::availableCores() - 1),
+simulate_groups_furrr <- function(sim_n,
+                                  core_n = as.integer(future::availableCores() - 1),
                                   duration,
                                   group_n,
                                   size,
                                   name,
-                                  delta,
+                                  gamma,
                                   intro_n,
                                   r0,
                                   generation_time,
                                   incubation_period = NULL,
-                                  dt = 1,
-                                  stack = TRUE) {
+                                  dt = 1) {
   # Set up parallel processing using furrr
-  future::plan("future::multisession", workers = n_cores)
+  future::plan("future::multisession", workers = core_n)
 
   # Run the simulations in parallel
-  results <- furrr::future_map(1:n_simulations, ~ {
+  results <- furrr::future_map(1:sim_n, ~ {
     simulate_groups(
       duration = duration,
       group_n = group_n,
       size = size,
       name = name,
-      delta = delta,
+      gamma = gamma,
       intro_n = intro_n,
       r0 = r0,
       generation_time = generation_time,
@@ -185,16 +185,5 @@ simulate_groups_furrr <- function(n_simulations,
   .options = furrr::furrr_options(seed = TRUE),
   verbose = FALSE
   )
-
-
-  if (isTRUE(stack)) {
-    #stack simulations
-    data <- purrr::map_dfr(results, ~ .x$data, .id = "simulation")
-    stats <- purrr::map_dfr(results, ~ .x$stats, .id = "simulation")
-
-    return(list(data = data, stats = stats))
-
-  } else {
-    return(results)
-  }
+  return(results)
 }
