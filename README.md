@@ -119,7 +119,7 @@ pacman::p_load_gh("CyGei/linktree")
 est <- get_gamma(
   from = sim$source_group,
   to = sim$group,
-  f = setNames(size/sum(size), name)
+  f = setNames(size, name)
   )
 
 plot(est)
