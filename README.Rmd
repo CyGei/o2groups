@@ -17,7 +17,7 @@ The `o2groups` package provides a framework for simulating outbreaks using branc
 The package is still under development and is not yet available on CRAN.
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, dpi=400)
 ```
 
 # Installation
@@ -67,7 +67,7 @@ sim <- simulate_groups(
 head(sim)
 ```
 
-```{r}
+```{r, out.width="100%"}
 pacman::p_load_gh("reconhub/epicontacts@timeline")
 pacman::p_load(ggplot2)
 x <- make_epicontacts(linelist = sim[, c("id", "group", "date_onset")],
