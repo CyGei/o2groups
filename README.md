@@ -10,7 +10,7 @@ and patients or specific age groups.
 We developed an estimator that utilises information on transmission
 chains (who infected whom), enabling the identification and
 quantification of transmission patterns between groups (see package
-`linktree`)
+[`linktree`](https://github.com/CyGei/linktree))
 
 The `o2groups` package provides a framework for simulating outbreaks
 using branching processes specifically designed for scenarios involving
@@ -22,8 +22,7 @@ The package is still under development and is not yet available on CRAN.
 # Installation
 
 ``` r
-#devtools::install_github("CyGei/o2groups")
-library(o2groups)
+pacman::p_load_gh("CyGei/o2groups")
 ```
 
 # The assortativity coefficient
@@ -88,39 +87,45 @@ head(sim)
     ## 6     HCW DJE8PP gZ6tF2      patient              2          5
 
 ``` r
-library(epicontacts)
-```
-
-    ## 
-    ## Attaching package: 'epicontacts'
-
-    ## The following object is masked _by_ '.GlobalEnv':
-    ## 
-    ##     sim
-
-``` r
+pacman::p_load_gh("reconhub/epicontacts@timeline")
+pacman::p_load(ggplot2)
 x <- make_epicontacts(linelist = sim[, c("id", "group", "date_onset")],
                       contacts = sim[, c("source_group","source", "id")],
                       id = "id",
                       from = "source",
                       to = "id",
                       directed = TRUE)
-```
-
-    ## Warning in make_epicontacts(linelist = sim[, c("id", "group", "date_onset")], :
-    ## 4 NA IDs in the contacts have been renamed NA_1 to NA_4
-
-``` r
-p = vis_epicontacts(
+plot(
   x,
+  x_axis = "date_onset",
+  node_size = 2,
   node_color = "group",
   edge_color = "source_group",
-  node_shape = "group",
-  shapes = c(HCW = "stethoscope",
-             patient = "user"),
-  edge_col_pal = c(HCW = "orange",
-                   patient = "purple"),
-)
+  method = "ggplot"
+) +
+  scale_color_manual(values =  c("HCW" = "orange",
+                                 "patient" = "purple"),
+                     guide="none")+
+  scale_fill_manual(values =  c("HCW" = "orange",
+                                "patient" = "purple"))
 ```
 
-![](README_files/figure-gfm/p.png)
+<img src="README_files/figure-gfm/unnamed-chunk-4-1.png" width="100%" />
+
+## Estimation using [`linktree`](https://github.com/CyGei/linktree)
+
+``` r
+pacman::p_load_gh("CyGei/linktree")
+est <- get_gamma(
+  from = sim$source_group,
+  to = sim$group,
+  f = setNames(size/sum(size), name)
+  )
+
+plot(est)
+```
+
+![](README_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+
+See package [`linktree`](https://github.com/CyGei/linktree) for more
+details on estimating assortativity coefficients.
