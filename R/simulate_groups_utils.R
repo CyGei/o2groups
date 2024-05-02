@@ -25,13 +25,13 @@ get_stats <- function(data , t, group_n, name, size, groupFOI, dt){
   stats$n_infected <- sapply(name, function(group) {
     sum(data$group == group)
   })
-  stats$n_susceptible <- size - stats$n_infected
+  stats$n_susceptible <- as.integer(size - stats$n_infected)
   stats$prop_susceptible <- stats$n_susceptible / size
   stats$foi <- groupFOI
   stats$infection_rate <- stats$foi / size
   stats$infection_prob <- 1 - exp(-stats$infection_rate * dt)
   stats$new_cases <- stats::rbinom(
-    n = group_n,
+    n = as.integer(group_n),
     size = stats$n_susceptible,
     prob = stats$infection_prob
   )
@@ -127,12 +127,10 @@ generate_new_cases <- function(data, t, sources) {
 #' @param generation_time The probability mass function (pmf) of the generation time (sums to 1).
 #' @param incubation_period Optional. A vector of integers that will be sampled with replacement.
 #' @param dt The time step of the simulation (default = 1 day)
-#' @param quietly Logical. Whether to print progress or not. Default is TRUE (doesn't print progress).
 
 #' @return A list of transmission trees (data.frame) informing who infected whom and when.
 
-#' @export
-#'
+#' @keywords internal
 #' @examples
 #' \dontrun{
 #' library(furrr)

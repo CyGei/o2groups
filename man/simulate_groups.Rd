@@ -42,7 +42,7 @@ simulate_groups(
 \item{quietly}{Logical. Whether to print progress or not. Default is TRUE (doesn't print progress).}
 }
 \value{
-A list containing the individual linelist, the summary statistics per time step & input matrices (Mcol/M0).
+The transmission tree (data.frame) informing who infected whom and when.
 }
 \description{
 Simulate the spread of an infectious disease among multiple groups

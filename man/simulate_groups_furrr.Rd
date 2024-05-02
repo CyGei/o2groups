@@ -5,65 +5,62 @@
 \title{simulate_groups_furrr}
 \usage{
 simulate_groups_furrr(
-  n_simulations,
-  n_cores = as.integer(future::availableCores() - 1),
+  sim_n,
+  core_n = as.integer(future::availableCores() - 1),
   duration,
   group_n,
   size,
   name,
-  delta,
+  gamma,
   intro_n,
   r0,
   generation_time,
   incubation_period = NULL,
-  dt = 1,
-  stack = TRUE
+  dt = 1
 )
 }
 \arguments{
-\item{n_simulations}{The number of simulations to run.}
+\item{sim_n}{The number of simulations to run.}
 
-\item{n_cores}{The number of cores to use in parallel. Default is as.integer(future::availableCores() - 1).}
+\item{core_n}{The number of cores to use in parallel. Default is as.integer(future::availableCores() - 1).}
 
-\item{duration}{An integer value representing the duration of the simulation.}
+\item{duration}{An integer value representing the duration of the simulation}
 
-\item{group_n}{An integer value representing the number of groups.}
+\item{group_n}{An integer value representing the number of groups}
 
-\item{size}{A vector of integers representing the sizes of each group.}
+\item{size}{A vector of integers representing the sizes of each group}
 
-\item{name}{A vector of characters representing the names of each group.}
+\item{name}{A vector of characters representing the names of each group}
 
-\item{delta}{A numeric vector representing the within-group transmission factor (assortativity coefficient) for each group.}
+\item{gamma}{A numeric vector representing the within-group transmission factor (assortativity coefficient) for each group}
 
-\item{intro_n}{A vector of integers representing the number of introductions for each group.}
+\item{intro_n}{A vector of n introductions respective to each group.}
 
-\item{r0}{A numeric vector representing the basic reproductive number (R0) for each group.}
+\item{r0}{A numeric vector representing the basic reproductive number (R0) for each group}
 
-\item{generation_time}{The probability mass function (pmf) of the generation time.}
+\item{generation_time}{The probability mass function (pmf) of the generation time (sums to 1).}
 
 \item{incubation_period}{Optional. A vector of integers that will be sampled with replacement.}
 
-\item{dt}{The time step of the simulation (default = 1 day).}
-
-\item{stack}{Logical. If TRUE, returns a stacked dataframe by simulation ID else returns a list of \code{simulate_groups()} outputs. Default is TRUE.}
+\item{dt}{The time step of the simulation (default = 1 day)}
 }
 \value{
-A list containing data frames with information about the simulated groups and the statistics of the simulation & matrices inputs (Mcol/M0).
+A list of transmission trees (data.frame) informing who infected whom and when.
 }
 \description{
-Simulate multiple outbreaks in parallel. A furrr wrapper for \code{simulate_groups}.
+Simulate the spread of an infectious disease among multiple groups in parallel.
 }
 \examples{
 \dontrun{
 library(furrr)
 simulate_groups_furrr(
-  n_simulations = 20,
-  n_cores = 5,
+  sim_n = 20,
+  core_n = 5,
   duration = 100,
   group_n = 3,
   size = c(100, 50, 200),
   name = c("A", "B", "C"),
-  delta = c(1, 2, 5),
+  gamma = c(1, 2, 5),
   intro_n = c(7, 5),
   r0 = c(2, 3, 4),
   generation_time = c(0.1, 0.3, 0.4, 0.2))
@@ -71,3 +68,4 @@ simulate_groups_furrr(
 
 
 }
+\keyword{internal}
